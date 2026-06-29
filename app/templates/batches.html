@@ -1,0 +1,95 @@
+{% extends "base.html" %}
+{% block title %}Batches · Downsizarr{% endblock %}
+{% block nav_batches %}active{% endblock %}
+{% block content %}
+<div class="page-head">
+  <h1>Batches</h1>
+  <a class="btn primary" href="/browse">+ New batch</a>
+</div>
+
+<p class="hint">
+  Once a batch finishes you can delete the original source files — individually
+  or all at once. Deletion is only ever offered for files whose HEVC conversion
+  <strong>completed and was verified</strong>; failed/skipped items are left
+  alone, and converted outputs are never touched.
+</p>
+
+{% if not batches %}
+  <div class="card"><p class="muted">No batches yet. <a href="/browse">Create one →</a></p></div>
+{% endif %}
+
+{% for b in batches %}
+<section class="card batch">
+  <div class="batch-head">
+    <div>
+      <h3>{{ b.batch.name or ("Batch #" ~ b.batch.id) }}</h3>
+      <span class="job-meta">
+        #{{ b.batch.id }} · {{ b.batch.created_at.strftime("%Y-%m-%d %H:%M") }}
+        · {{ b.batch.encoder }} · CRF {{ b.batch.crf }}/{{ b.batch.preset }}
+        · {{ b.total }} file(s)
+      </span>
+    </div>
+    <div class="batch-badges">
+      {% for status, n in b.counts.items() %}
+        <span class="badge {{ status }}">{{ n }} {{ status }}</span>
+      {% endfor %}
+    </div>
+  </div>
+
+  <div class="batch-stats">
+    <span>Saved: <strong class="good">{{ human_bytes(b.total_saved) }}</strong></span>
+    {% if b.deleted_count %}
+      <span class="muted">· {{ b.deleted_count }} source(s) already deleted</span>
+    {% endif %}
+  </div>
+
+  {% if b.is_complete and b.deletable_count > 0 %}
+  <form method="post" action="/batches/{{ b.batch.id }}/delete-sources"
+        onsubmit="return confirm('Permanently delete {{ b.deletable_count }} original source file(s) for this batch? This frees ~{{ human_bytes(b.deletable_bytes) }} and cannot be undone. Converted HEVC files are kept.');">
+    <button type="submit" class="btn danger">
+      🗑 Delete {{ b.deletable_count }} source file(s) · frees ~{{ human_bytes(b.deletable_bytes) }}
+    </button>
+  </form>
+  {% elif not b.is_complete %}
+    <p class="hint">Batch still running — source deletion unlocks when it finishes.</p>
+  {% elif b.has_completed and b.deletable_count == 0 %}
+    <p class="hint">All eligible sources for this batch have been deleted. ✔</p>
+  {% endif %}
+
+  <details class="batch-files">
+    <summary>Show files ({{ b.total }})</summary>
+    <table class="tbl">
+      <thead><tr><th>File</th><th>Status</th><th>Original</th><th>New</th><th>Saved</th><th>Source</th><th></th></tr></thead>
+      <tbody>
+        {% for job in b.jobs %}
+        <tr>
+          <td title="{{ job.source_path }}">{{ job.source_path.split('/')|last }}</td>
+          <td><span class="badge {{ job.status }}">{{ job.status }}</span></td>
+          <td>{{ human_bytes(job.source_size) }}</td>
+          <td>{% if job.output_size %}{{ human_bytes(job.output_size) }}{% else %}–{% endif %}</td>
+          <td class="{% if job.saved_bytes > 0 %}good{% endif %}">
+            {% if job.status == "completed" %}{{ human_bytes(job.saved_bytes) }}{% else %}–{% endif %}
+          </td>
+          <td>
+            {% if job.source_deleted %}
+              <span class="tag warn">deleted</span>
+            {% else %}
+              <span class="muted">present</span>
+            {% endif %}
+          </td>
+          <td>
+            {% if job.status == "completed" and not job.source_deleted %}
+            <form method="post" action="/jobs/{{ job.id }}/delete-source" class="inline-form"
+                  onsubmit="return confirm('Delete the original source file?\n{{ job.source_path }}\n\nThe converted HEVC file is kept. This cannot be undone.');">
+              <button type="submit" class="btn tiny danger">Delete source</button>
+            </form>
+            {% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </details>
+</section>
+{% endfor %}
+{% endblock %}

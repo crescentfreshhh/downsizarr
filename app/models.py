@@ -79,6 +79,8 @@ class Job(SQLModel, table=True):
     width: int = 0
     height: int = 0
 
+    source_deleted: bool = False
+
     created_at: datetime = Field(default_factory=utcnow)
     started_at: Optional[datetime] = None
     finished_at: Optional[datetime] = None

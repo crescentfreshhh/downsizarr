@@ -193,6 +193,68 @@ def cancel_job(job_id: int):
     return RedirectResponse(url="/jobs", status_code=303)
 
 
+# --------------------------------------------------------------------------
+# Source-file deletion (post-conversion cleanup)
+# --------------------------------------------------------------------------
+def _delete_source_for_job(session, job: Job) -> tuple[bool, str]:
+    """Delete a job's SOURCE file, but only when it's provably safe.
+
+    Requires: the job completed, its source hasn't already been removed, and the
+    verified HEVC output still exists on disk and is non-empty.
+    """
+    if job.status != JobStatus.COMPLETED.value:
+        return False, "job not completed"
+    if job.source_deleted:
+        return False, "already deleted"
+
+    out = Path(job.output_path) if job.output_path else None
+    if not out or not out.exists() or out.stat().st_size == 0:
+        return False, "converted output missing — refusing to delete source"
+
+    try:
+        media.remove_within_root(job.source_path)
+    except FileNotFoundError:
+        # Source is already gone; reconcile our bookkeeping.
+        job.source_deleted = True
+        session.add(job)
+        return True, "source already gone"
+    except (media.PathOutsideRootError, IsADirectoryError) as exc:
+        return False, str(exc)
+
+    job.source_deleted = True
+    session.add(job)
+    log.info("Deleted source for job %s: %s", job.id, job.source_path)
+    return True, "deleted"
+
+
+@app.post("/jobs/{job_id}/delete-source")
+def delete_job_source(job_id: int):
+    with session_scope() as session:
+        job = session.get(Job, job_id)
+        if job:
+            _delete_source_for_job(session, job)
+    return RedirectResponse(url="/batches", status_code=303)
+
+
+@app.post("/batches/{batch_id}/delete-sources")
+def delete_batch_sources(batch_id: int):
+    """Delete the sources for every completed job in a finished batch."""
+    with session_scope() as session:
+        jobs = session.exec(select(Job).where(Job.batch_id == batch_id)).all()
+        active = {JobStatus.QUEUED.value, JobStatus.RUNNING.value}
+        if jobs and not any(j.status in active for j in jobs):
+            for job in jobs:
+                _delete_source_for_job(session, job)
+    return RedirectResponse(url="/batches", status_code=303)
+
+
+@app.get("/batches", response_class=HTMLResponse)
+def batches_page(request: Request):
+    return templates.TemplateResponse(
+        "batches.html", {"request": request, "batches": metrics.batch_summaries()}
+    )
+
+
 @app.get("/history", response_class=HTMLResponse)
 def history(request: Request):
     with session_scope() as session:

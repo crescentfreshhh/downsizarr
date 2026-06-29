@@ -81,6 +81,66 @@ def test_progress_parsing(line, duration, expected):
     assert transcoder._parse_progress(line, duration) == expected
 
 
+class _FakeSession:
+    """Minimal stand-in: _delete_source_for_job only ever calls .add()."""
+    def add(self, _obj):
+        pass
+
+
+def _make_job(name, *, status, with_output=True, source_deleted=False):
+    """Create source/output files under the configured media root."""
+    from app.config import settings
+    from app.models import Job
+
+    root = settings.media_root / name
+    root.mkdir(parents=True, exist_ok=True)
+    src = root / "src.mkv"
+    src.write_bytes(b"original")
+    out = root / "src.hevc.mkv"
+    if with_output:
+        out.write_bytes(b"converted-output")
+    return Job(
+        status=status.value,
+        source_path=str(src),
+        output_path=str(out),
+        source_deleted=source_deleted,
+        source_size=8,
+    ), src, out
+
+
+def test_delete_source_only_when_completed():
+    from app.main import _delete_source_for_job
+    from app.models import JobStatus
+
+    job, src, _ = _make_job("t-notdone", status=JobStatus.FAILED)
+    ok, _ = _delete_source_for_job(_FakeSession(), job)
+    assert ok is False
+    assert src.exists()  # never deletes a non-completed job's source
+
+
+def test_delete_source_refuses_without_output():
+    from app.main import _delete_source_for_job
+    from app.models import JobStatus
+
+    job, src, _ = _make_job("t-noout", status=JobStatus.COMPLETED, with_output=False)
+    ok, reason = _delete_source_for_job(_FakeSession(), job)
+    assert ok is False
+    assert src.exists()  # source kept because the HEVC output is missing
+    assert "missing" in reason
+
+
+def test_delete_source_happy_path():
+    from app.main import _delete_source_for_job
+    from app.models import JobStatus
+
+    job, src, out = _make_job("t-happy", status=JobStatus.COMPLETED)
+    ok, _ = _delete_source_for_job(_FakeSession(), job)
+    assert ok is True
+    assert not src.exists()      # source removed
+    assert out.exists()          # converted output preserved
+    assert job.source_deleted is True
+
+
 def test_human_bytes():
     assert human_bytes(0) == "0 B"
     assert human_bytes(1024) == "1.00 KB"

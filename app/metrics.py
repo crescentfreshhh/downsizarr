@@ -3,10 +3,12 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
+from collections import defaultdict
+
 from sqlmodel import select
 
 from .database import session_scope
-from .models import Job, JobStatus
+from .models import Batch, Job, JobStatus
 
 
 def human_bytes(num: int | float) -> str:
@@ -77,3 +79,63 @@ def collect() -> Stats:
     if len(stats.points) > 60:
         stats.points = stats.points[-60:]
     return stats
+
+
+@dataclass
+class BatchView:
+    batch: Batch
+    jobs: list[Job]
+    counts: dict[str, int] = field(default_factory=dict)
+    total: int = 0
+    total_saved: int = 0
+    is_complete: bool = False        # nothing queued or running
+    has_completed: bool = False      # at least one verified output exists
+    deletable_count: int = 0         # completed jobs whose source is still here
+    deletable_bytes: int = 0         # bytes reclaimable if those sources go
+    deleted_count: int = 0           # sources already deleted
+
+
+_ACTIVE = {JobStatus.QUEUED.value, JobStatus.RUNNING.value}
+
+
+def batch_summaries() -> list[BatchView]:
+    """One view-model per batch, newest first, for the Batches page."""
+    with session_scope() as session:
+        batches = session.exec(select(Batch).order_by(Batch.id.desc())).all()
+        jobs = session.exec(select(Job)).all()
+
+    grouped: dict[int, list[Job]] = defaultdict(list)
+    for job in jobs:
+        grouped[job.batch_id].append(job)
+
+    views: list[BatchView] = []
+    for batch in batches:
+        bjobs = sorted(grouped.get(batch.id, []), key=lambda j: j.id or 0)
+        counts: dict[str, int] = defaultdict(int)
+        total_saved = 0
+        deletable_count = deletable_bytes = deleted_count = 0
+        for job in bjobs:
+            counts[job.status] += 1
+            if job.status == JobStatus.COMPLETED.value:
+                total_saved += job.saved_bytes
+                if job.source_deleted:
+                    deleted_count += 1
+                else:
+                    deletable_count += 1
+                    deletable_bytes += job.source_size
+        views.append(
+            BatchView(
+                batch=batch,
+                jobs=bjobs,
+                counts=dict(counts),
+                total=len(bjobs),
+                total_saved=total_saved,
+                is_complete=bool(bjobs)
+                and not any(j.status in _ACTIVE for j in bjobs),
+                has_completed=counts.get(JobStatus.COMPLETED.value, 0) > 0,
+                deletable_count=deletable_count,
+                deletable_bytes=deletable_bytes,
+                deleted_count=deleted_count,
+            )
+        )
+    return views

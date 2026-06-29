@@ -35,6 +35,10 @@ holds up. Downsizarr is built around a **quality-first, QA-first** workflow.
 - **Metrics** — total space saved, % reduction, per-file deltas, a cumulative
   savings chart, and full conversion history.
 - **Live queue** — progress bars, status, and cancel, updated in real time.
+- **Post-conversion cleanup** — once a batch finishes, optionally delete the
+  original source files (one at a time, or the whole batch) from the **Batches**
+  page. Deletion is only ever offered for files whose conversion *completed and
+  was verified*, and the HEVC output is never touched.
 
 ## Quick start
 
@@ -68,8 +72,20 @@ docker compose up -d --build
 6. Verify the new `*.hevc.*` files look right, then come back for bigger batches.
 7. Track savings on the **Dashboard** / **History**.
 
-When you're happy with the converted files, deleting the originals is a manual
-step you do yourself — Downsizarr will never delete source media.
+### Deleting originals after conversion
+
+When you're happy with a batch's converted files, head to the **Batches** page:
+
+- **Delete one source** — each completed file has a *Delete source* button.
+- **Delete a whole batch's sources** — once every job in the batch has finished,
+  a single button removes all the originals for that batch and shows how much
+  space it frees.
+
+Safety rails: Downsizarr will only delete a source file whose conversion
+**completed and was verified**, and only while the converted HEVC output still
+exists on disk. Failed, skipped or still-running items are never deleted, and
+the converted outputs are never deleted. Deletion is permanent — Downsizarr does
+not use a trash/recycle folder — so confirm prompts are shown before any delete.
 
 ## Configuration
 

@@ -58,6 +58,16 @@ class ProbeResult:
     size: int
 
 
+def remove_within_root(raw: str | Path) -> None:
+    """Delete a single file, but only if it lives inside the media root."""
+    target = safe_path(raw)
+    if target == settings.media_root.resolve():
+        raise PathOutsideRootError("refusing to delete the media root")
+    if target.is_dir():
+        raise IsADirectoryError(target)
+    target.unlink()
+
+
 def is_video(path: Path) -> bool:
     return path.suffix.lower() in settings.video_extensions
 

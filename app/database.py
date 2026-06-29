@@ -9,7 +9,7 @@ from __future__ import annotations
 from contextlib import contextmanager
 from typing import Iterator
 
-from sqlalchemy import event
+from sqlalchemy import event, text
 from sqlalchemy.engine import Engine
 from sqlmodel import Session, SQLModel, create_engine
 
@@ -44,6 +44,28 @@ def init_db() -> None:
     from . import models  # noqa: F401
 
     SQLModel.metadata.create_all(get_engine())
+    _run_lightweight_migrations()
+
+
+def _run_lightweight_migrations() -> None:
+    """Add columns introduced after a DB was first created.
+
+    SQLModel's create_all never alters existing tables, so we add any missing
+    columns by hand. Each entry is (table, column, column DDL with default).
+    """
+    additions = [
+        ("job", "source_deleted", "BOOLEAN NOT NULL DEFAULT 0"),
+    ]
+    with session_scope() as session:
+        for table, column, ddl in additions:
+            existing = {
+                row[1]
+                for row in session.execute(text(f"PRAGMA table_info({table})")).all()
+            }
+            if column not in existing:
+                session.execute(
+                    text(f"ALTER TABLE {table} ADD COLUMN {column} {ddl}")
+                )
 
 
 @contextmanager

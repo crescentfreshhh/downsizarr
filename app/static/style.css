@@ -138,6 +138,16 @@ main { max-width: 1100px; margin: 0 auto; padding: 26px 22px 60px; }
 .badge.canceled { background: #2a2f3a; color: var(--muted); }
 .badge.skipped { background: #3a300f; color: var(--warn); }
 
+/* Batches */
+.batch-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; }
+.batch-head h3 { margin: 0 0 2px; }
+.batch-badges { display: flex; flex-wrap: wrap; gap: 6px; justify-content: flex-end; }
+.batch-stats { margin: 10px 0 12px; font-size: .9rem; }
+.batch-files { margin-top: 12px; }
+.batch-files summary { cursor: pointer; color: var(--muted); font-size: .85rem; }
+.batch-files summary:hover { color: var(--text); }
+.batch-files .tbl { margin-top: 10px; }
+
 .probe-results { margin-top: 16px; border-top: 1px solid var(--border); padding-top: 14px; }
 .probe-results h4 { margin: 0 0 10px; }
 
