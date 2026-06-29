@@ -25,7 +25,18 @@ log = logging.getLogger("downsizarr")
 
 BASE_DIR = Path(__file__).resolve().parent
 templates = Jinja2Templates(directory=str(BASE_DIR / "templates"))
+def _vmaf_class(score) -> str:
+    if score is None:
+        return ""
+    if score >= 95:
+        return "good"
+    if score >= 90:
+        return "ok-q"
+    return "warn-q"
+
+
 templates.env.globals["human_bytes"] = metrics.human_bytes
+templates.env.globals["vmaf_class"] = _vmaf_class
 templates.env.globals["version"] = __version__
 templates.env.globals["encoders"] = list(Encoder)
 templates.env.globals["settings"] = settings
@@ -86,6 +97,7 @@ def browse(request: Request, path: str = ""):
             "default_encoder": settings.default_encoder,
             "default_crf": settings.default_crf,
             "default_preset": settings.default_preset,
+            "default_vmaf": settings.default_vmaf,
         },
     )
 
@@ -109,20 +121,43 @@ def probe_files(request: Request, files: list[str] = Form(default=[])):
 @app.post("/batches")
 def create_batch(
     files: list[str] = Form(default=[]),
+    folder: str = Form(default=""),
+    recursive: bool = Form(default=False),
     encoder: str = Form(default=settings.default_encoder),
     crf: int = Form(default=settings.default_crf),
     preset: str = Form(default=settings.default_preset),
     ten_bit: bool = Form(default=False),
+    compute_vmaf: bool = Form(default=False),
     limit: int = Form(default=0),
     note: str = Form(default=""),
 ):
-    """Create a batch and enqueue jobs for the selected files."""
+    """Create a batch and enqueue jobs.
+
+    Files come from explicit checkbox selections and/or, when ``recursive`` is
+    set, every convertible video under ``folder``. Probing happens later in the
+    worker so even huge recursive batches enqueue instantly.
+    """
     try:
         encoder_enum = Encoder(encoder)
     except ValueError:
         encoder_enum = Encoder.LIBX265
 
-    selected = files[:limit] if limit and limit > 0 else files
+    # Gather candidates: recursive folder expansion first, then explicit picks.
+    candidates: list[str] = []
+    if recursive:
+        try:
+            candidates.extend(media.collect_videos(folder, recursive=True))
+        except (FileNotFoundError, media.PathOutsideRootError) as exc:
+            log.warning("Recursive collect failed for %r: %s", folder, exc)
+    candidates.extend(files)
+
+    # De-duplicate while preserving order, then apply the batch limit.
+    seen: set[str] = set()
+    ordered = [c for c in candidates if not (c in seen or seen.add(c))]
+    selected = ordered[:limit] if limit and limit > 0 else ordered
+
+    if not selected:
+        return RedirectResponse(url="/browse", status_code=303)
 
     with session_scope() as session:
         batch = Batch(
@@ -131,6 +166,7 @@ def create_batch(
             crf=crf,
             preset=preset,
             ten_bit=ten_bit,
+            compute_vmaf=compute_vmaf,
             note=note,
         )
         session.add(batch)
@@ -143,25 +179,22 @@ def create_batch(
                 continue
             if not src.exists():
                 continue
+            # Fast: record size via stat() only; worker probes codec/duration.
             try:
-                probed = media.probe(src)
-            except Exception:
-                probed = media.ProbeResult("", 0.0, 0, 0, src.stat().st_size)
-
-            job = Job(
-                batch_id=batch.id,
-                source_path=str(src),
-                encoder=encoder_enum.value,
-                crf=crf,
-                preset=preset,
-                ten_bit=ten_bit,
-                source_codec=probed.codec,
-                source_size=probed.size,
-                source_duration=probed.duration,
-                width=probed.width,
-                height=probed.height,
+                size = src.stat().st_size
+            except OSError:
+                size = 0
+            session.add(
+                Job(
+                    batch_id=batch.id,
+                    source_path=str(src),
+                    encoder=encoder_enum.value,
+                    crf=crf,
+                    preset=preset,
+                    ten_bit=ten_bit,
+                    source_size=size,
+                )
             )
-            session.add(job)
 
     return RedirectResponse(url="/jobs", status_code=303)
 

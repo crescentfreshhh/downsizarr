@@ -51,6 +51,7 @@ class Batch(SQLModel, table=True):
     crf: int = 18
     preset: str = "slow"
     ten_bit: bool = False
+    compute_vmaf: bool = False
     note: str = ""
 
 
@@ -71,13 +72,19 @@ class Job(SQLModel, table=True):
     preset: str = "slow"
     ten_bit: bool = False
 
-    # Probed / measured metadata.
+    # Probed / measured metadata. NOTE: source_size (the ORIGINAL file's size in
+    # bytes) is recorded before transcoding and is deliberately retained for the
+    # life of the row -- even after the original file is deleted -- so it remains
+    # available for later deduplication / accounting work.
     source_codec: str = ""
-    source_size: int = 0           # bytes
+    source_size: int = 0           # bytes (original; kept after source deletion)
     output_size: int = 0           # bytes
     source_duration: float = 0.0   # seconds
     width: int = 0
     height: int = 0
+
+    # Quality score (0..100) of the output vs the source, if VMAF was run.
+    vmaf_score: Optional[float] = None
 
     source_deleted: bool = False
 

@@ -59,7 +59,7 @@
   <details class="batch-files">
     <summary>Show files ({{ b.total }})</summary>
     <table class="tbl">
-      <thead><tr><th>File</th><th>Status</th><th>Original</th><th>New</th><th>Saved</th><th>Source</th><th></th></tr></thead>
+      <thead><tr><th>File</th><th>Status</th><th>Original</th><th>New</th><th>Saved</th><th>VMAF</th><th>Source</th><th></th></tr></thead>
       <tbody>
         {% for job in b.jobs %}
         <tr>
@@ -69,6 +69,9 @@
           <td>{% if job.output_size %}{{ human_bytes(job.output_size) }}{% else %}–{% endif %}</td>
           <td class="{% if job.saved_bytes > 0 %}good{% endif %}">
             {% if job.status == "completed" %}{{ human_bytes(job.saved_bytes) }}{% else %}–{% endif %}
+          </td>
+          <td class="{{ vmaf_class(job.vmaf_score) }}">
+            {% if job.vmaf_score is not none %}{{ job.vmaf_score }}{% else %}–{% endif %}
           </td>
           <td>
             {% if job.source_deleted %}

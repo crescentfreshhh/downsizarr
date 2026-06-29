@@ -37,6 +37,14 @@ class Settings:
     default_encoder: str = os.getenv("DOWNSIZARR_DEFAULT_ENCODER", "libx265")
     default_crf: int = int(os.getenv("DOWNSIZARR_DEFAULT_CRF", "18"))
     default_preset: str = os.getenv("DOWNSIZARR_DEFAULT_PRESET", "slow")
+    default_vmaf: bool = field(
+        default_factory=lambda: _bool("DOWNSIZARR_DEFAULT_VMAF", False)
+    )
+    # Skip files that are already HEVC/H265 instead of pointlessly re-encoding.
+    skip_already_hevc: bool = field(
+        default_factory=lambda: _bool("DOWNSIZARR_SKIP_ALREADY_HEVC", True)
+    )
+    vmaf_threads: int = int(os.getenv("DOWNSIZARR_VMAF_THREADS", "0"))  # 0 = auto
 
     ffmpeg: str = os.getenv("DOWNSIZARR_FFMPEG", "ffmpeg")
     ffprobe: str = os.getenv("DOWNSIZARR_FFPROBE", "ffprobe")

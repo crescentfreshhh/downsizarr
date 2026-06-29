@@ -32,6 +32,15 @@ holds up. Downsizarr is built around a **quality-first, QA-first** workflow.
   failed/partial outputs are cleaned up. Existing outputs are skipped.
 - **QA-friendly batches** — select a whole folder but cap how many actually run
   with a per-batch limit, so you can test a few before committing.
+- **Recursive folder conversion** — point at a top-level folder and queue every
+  video underneath it (all subfolders) in one click. Already-HEVC files and
+  existing outputs are skipped automatically.
+- **VMAF quality scoring** — optionally score each converted file 0–100 against
+  its source (95+ ≈ visually transparent) so you can *prove* quality held up,
+  not just hope it did.
+- **Dedup-ready provenance** — the original file's size is recorded in the
+  database and kept forever (even after you delete the original), and is also
+  stamped into the converted file's own metadata so it survives without the DB.
 - **Metrics** — total space saved, % reduction, per-file deltas, a cumulative
   savings chart, and full conversion history.
 - **Live queue** — progress bars, status, and cancel, updated in real time.
@@ -101,8 +110,35 @@ All settings are environment variables (see [`.env.example`](.env.example)):
 | `DOWNSIZARR_DEFAULT_ENCODER` | `libx265` | `libx265`, `hevc_nvenc`, `hevc_qsv`, `hevc_vaapi`. |
 | `DOWNSIZARR_DEFAULT_CRF` | `18` | Quality target (lower = better/larger). |
 | `DOWNSIZARR_DEFAULT_PRESET` | `slow` | Encoder preset. |
+| `DOWNSIZARR_DEFAULT_VMAF` | `false` | Measure VMAF quality by default (slower). |
+| `DOWNSIZARR_VMAF_THREADS` | `0` | Threads for VMAF scoring (0 = auto). |
+| `DOWNSIZARR_SKIP_ALREADY_HEVC` | `true` | Skip files already in HEVC/H265 instead of re-encoding. |
 | `DOWNSIZARR_DURATION_TOLERANCE` | `1.0` | Max allowed source/output duration drift (s) during verification. |
 | `DOWNSIZARR_VIDEO_EXTENSIONS` | common set | Extensions treated as convertible video. |
+
+### VMAF quality scoring
+
+Tick **Measure quality (VMAF)** on a batch and each converted file gets a score
+from 0–100 comparing it to the original:
+
+- **95–100** — visually indistinguishable from the source.
+- **~93+** — generally considered "transparent".
+- lower — visible quality loss; worth investigating.
+
+Scores appear on the **Batches** and **History** pages. VMAF runs a second
+analysis pass, so batches with it enabled take longer. It requires an ffmpeg
+build with `libvmaf` — the bundled Docker image includes one. If `libvmaf`
+isn't present, conversions still run normally and the score simply shows "–".
+
+### Deduplication / provenance
+
+Downsizarr records each conversion's **original source file size** and keeps it
+permanently — it is *not* erased when you delete the original. It's also written
+into the converted file's container as metadata tags
+(`DOWNSIZARR_SOURCE_BYTES`, `DOWNSIZARR_SOURCE_NAME`), readable with
+`ffprobe -show_entries format_tags`, so the provenance travels with the file
+even if the database is lost. This makes later dedup/accounting work possible
+long after the originals are gone.
 
 ### Quality guidance
 

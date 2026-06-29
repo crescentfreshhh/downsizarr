@@ -117,6 +117,8 @@ class JobManager:
                 self._cancel.discard(job_id)
 
     def _execute(self, job_id: int) -> None:
+        from .models import Batch
+
         with session_scope() as session:
             job = session.get(Job, job_id)
             if job is None:
@@ -126,7 +128,8 @@ class JobManager:
             crf = job.crf
             preset = job.preset
             ten_bit = job.ten_bit
-            duration = job.source_duration
+            batch = session.get(Batch, job.batch_id) if job.batch_id else None
+            want_vmaf = bool(batch.compute_vmaf) if batch else False
 
         if job_id in self._cancel:
             self._finish(job_id, JobStatus.CANCELED)
@@ -134,6 +137,40 @@ class JobManager:
 
         if not src.exists():
             self._finish(job_id, JobStatus.FAILED, error=f"Source missing: {src}")
+            return
+
+        # Probe now (kept out of enqueue so big recursive batches queue fast).
+        from .media import probe
+
+        probed = None
+        duration = 0.0
+        source_size = src.stat().st_size
+        try:
+            probed = probe(src)
+            duration = probed.duration
+            source_size = probed.size or source_size
+            self._update(
+                job_id,
+                source_codec=probed.codec,
+                source_size=source_size,
+                source_duration=probed.duration,
+                width=probed.width,
+                height=probed.height,
+            )
+        except Exception as exc:
+            log.warning("Probe failed for job %s (%s): %s", job_id, src, exc)
+
+        # Don't waste cycles re-encoding something that's already HEVC.
+        if (
+            settings.skip_already_hevc
+            and probed is not None
+            and probed.codec in {"hevc", "h265"}
+        ):
+            self._finish(
+                job_id,
+                JobStatus.SKIPPED,
+                error="Source is already HEVC/H265",
+            )
             return
 
         dest = output_path_for(src)
@@ -162,6 +199,13 @@ class JobManager:
 
         from .models import Encoder
 
+        # Stamp the original file's size and name into the output container so
+        # the provenance survives even if the DB is lost (useful for dedup).
+        metadata = {
+            "DOWNSIZARR_SOURCE_BYTES": str(source_size),
+            "DOWNSIZARR_SOURCE_NAME": src.name,
+        }
+
         try:
             result = transcode(
                 src,
@@ -171,6 +215,7 @@ class JobManager:
                 preset=preset,
                 ten_bit=ten_bit,
                 duration=duration,
+                metadata=metadata,
                 on_progress=on_progress,
                 process_sink=sink,
             )
@@ -181,15 +226,36 @@ class JobManager:
                 self._finish(job_id, JobStatus.FAILED, error=str(exc))
             return
 
+        # Optional VMAF quality score (best effort; never fails the job).
+        vmaf_score = None
+        if want_vmaf:
+            from .transcoder import compute_vmaf, vmaf_available
+
+            if vmaf_available():
+                self._update(job_id, error="Scoring quality (VMAF)…")
+                vmaf_score = compute_vmaf(src, result.output_path)
+
         self._finish(
             job_id,
             JobStatus.COMPLETED,
             output_path=str(result.output_path),
             output_size=result.output_size,
+            vmaf_score=vmaf_score,
+            error="",
             progress=100.0,
         )
 
     # ----- DB mutation helpers --------------------------------------------
+    def _update(self, job_id: int, **fields) -> None:
+        """Patch arbitrary fields on a running job."""
+        with session_scope() as session:
+            job = session.get(Job, job_id)
+            if job is None:
+                return
+            for key, value in fields.items():
+                setattr(job, key, value)
+            session.add(job)
+
     def _set_progress(self, job_id: int, pct: float) -> None:
         with session_scope() as session:
             job = session.get(Job, job_id)

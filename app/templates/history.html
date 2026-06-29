@@ -15,7 +15,7 @@
   <table class="tbl">
     <thead>
       <tr><th>Finished</th><th>File</th><th>Encoder</th><th>CRF</th>
-          <th>Original</th><th>New</th><th>Saved</th><th>%</th></tr>
+          <th>Original</th><th>New</th><th>Saved</th><th>%</th><th>VMAF</th><th>Source</th></tr>
     </thead>
     <tbody>
       {% for job in jobs %}
@@ -28,6 +28,8 @@
         <td>{{ human_bytes(job.output_size) }}</td>
         <td class="good">{{ human_bytes(job.saved_bytes) }}</td>
         <td>{% if job.source_size %}{{ "%.0f"|format(job.saved_bytes / job.source_size * 100) }}%{% else %}–{% endif %}</td>
+        <td class="{{ vmaf_class(job.vmaf_score) }}">{% if job.vmaf_score is not none %}{{ job.vmaf_score }}{% else %}–{% endif %}</td>
+        <td>{% if job.source_deleted %}<span class="tag warn">deleted</span>{% else %}present{% endif %}</td>
       </tr>
       {% endfor %}
     </tbody>

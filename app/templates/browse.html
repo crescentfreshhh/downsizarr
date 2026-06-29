@@ -73,6 +73,20 @@
         <span class="hint">reduces banding; slightly larger</span>
       </label>
 
+      <label class="inline">
+        <input type="checkbox" name="compute_vmaf" value="true"
+               {% if default_vmaf %}checked{% endif %}> Measure quality (VMAF)
+        <span class="hint">scores each output 0–100 vs the original (95+ ≈ transparent). Adds a second pass, so it's slower.</span>
+      </label>
+
+      <hr class="sep">
+      <input type="hidden" name="folder" value="{{ current }}">
+      <label class="inline">
+        <input type="checkbox" name="recursive" value="true" id="recursive">
+        Convert this whole folder + subfolders
+        <span class="hint">Queues every video under <code>{{ current or "root" }}</code>. Ignores your individual ticks above. Already-HEVC files and existing <code>{{ settings.output_suffix }}</code> outputs are skipped automatically.</span>
+      </label>
+
       <label>Batch limit (max files to enqueue, 0 = all selected)
         <input type="number" name="limit" min="0" value="0">
         <span class="hint">Great for QA: select a folder, convert just a few first.</span>

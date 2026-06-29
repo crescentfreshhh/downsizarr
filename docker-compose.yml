@@ -29,8 +29,9 @@ services:
     # devices:
     #   - /dev/dri:/dev/dri
     # --- Hardware encoding (NVIDIA NVENC) ---
-    # Requires nvidia-container-toolkit on the host and an nvenc-capable ffmpeg
-    # build. Uncomment and run with the nvidia runtime:
+    # The bundled ffmpeg already includes nvenc; you just need
+    # nvidia-container-toolkit on the host. Uncomment and run with the nvidia
+    # runtime:
     # deploy:
     #   resources:
     #     reservations:

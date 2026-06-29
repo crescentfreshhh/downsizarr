@@ -141,6 +141,45 @@ def test_delete_source_happy_path():
     assert job.source_deleted is True
 
 
+def test_build_command_embeds_source_metadata():
+    cmd = transcoder.build_command(
+        Path("/in.mkv"), Path("/out.mkv"),
+        encoder=Encoder.LIBX265, crf=18, preset="slow",
+        metadata={"DOWNSIZARR_SOURCE_BYTES": "12345", "DOWNSIZARR_SOURCE_NAME": "in.mkv"},
+    )
+    joined = " ".join(cmd)
+    assert "DOWNSIZARR_SOURCE_BYTES=12345" in joined
+    assert "DOWNSIZARR_SOURCE_NAME=in.mkv" in joined
+
+
+def test_collect_videos_recursive(tmp_path, monkeypatch):
+    # Build a tree under a fresh root and point media at it via env-built path.
+    from app import media
+    from app.config import settings
+
+    root = settings.media_root / "tree"
+    (root / "Action").mkdir(parents=True, exist_ok=True)
+    (root / "Comedy").mkdir(parents=True, exist_ok=True)
+    (root / "Action" / "a.mkv").write_bytes(b"x")
+    (root / "Comedy" / "b.mp4").write_bytes(b"x")
+    (root / "Comedy" / "b.hevc.mp4").write_bytes(b"x")   # our output -> skipped
+    (root / "notes.txt").write_bytes(b"x")               # non-video -> skipped
+
+    found = media.collect_videos("tree", recursive=True)
+    names = sorted(Path(f).name for f in found)
+    assert names == ["a.mkv", "b.mp4"]
+
+    shallow = media.collect_videos("tree", recursive=False)
+    assert shallow == []  # no videos directly in tree/, only in subfolders
+
+
+def test_vmaf_degrades_gracefully(monkeypatch):
+    # When libvmaf is unavailable, scoring returns None instead of raising.
+    monkeypatch.setattr(transcoder, "_vmaf_available", False)
+    assert transcoder.vmaf_available() is False
+    assert transcoder.compute_vmaf(Path("/a.mkv"), Path("/b.mkv")) is None
+
+
 def test_human_bytes():
     assert human_bytes(0) == "0 B"
     assert human_bytes(1024) == "1.00 KB"

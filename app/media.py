@@ -78,6 +78,27 @@ def is_converted_output(path: Path) -> bool:
     return bool(suffix) and path.stem.endswith(suffix)
 
 
+def collect_videos(folder_rel: str = "", recursive: bool = True) -> list[str]:
+    """Return root-relative paths of convertible videos under a folder.
+
+    Skips hidden paths and files that already carry our output suffix so we
+    don't re-queue already-converted outputs. With ``recursive`` it walks every
+    subfolder; otherwise just the one folder.
+    """
+    base = safe_path(folder_rel) if folder_rel else settings.media_root.resolve()
+    if not base.exists():
+        raise FileNotFoundError(base)
+
+    iterator = base.rglob("*") if recursive else base.iterdir()
+    results: list[str] = []
+    for path in iterator:
+        if any(part.startswith(".") for part in path.relative_to(base).parts):
+            continue
+        if path.is_file() and is_video(path) and not is_converted_output(path):
+            results.append(rel_to_root(path))
+    return sorted(results)
+
+
 def list_dir(rel: str = "") -> tuple[str, list[Entry]]:
     """List a directory under the media root, dirs first then video files."""
     target = safe_path(rel) if rel else settings.media_root.resolve()

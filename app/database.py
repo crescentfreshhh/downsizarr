@@ -55,6 +55,8 @@ def _run_lightweight_migrations() -> None:
     """
     additions = [
         ("job", "source_deleted", "BOOLEAN NOT NULL DEFAULT 0"),
+        ("job", "vmaf_score", "FLOAT"),
+        ("batch", "compute_vmaf", "BOOLEAN NOT NULL DEFAULT 0"),
     ]
     with session_scope() as session:
         for table, column, ddl in additions:

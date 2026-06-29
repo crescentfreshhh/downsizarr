@@ -52,8 +52,18 @@ def build_command(
     crf: int,
     preset: str,
     ten_bit: bool = False,
+    metadata: dict[str, str] | None = None,
 ) -> list[str]:
-    """Construct the ffmpeg argument list for the requested encoder."""
+    """Construct the ffmpeg argument list for the requested encoder.
+
+    ``metadata`` entries are written into the output container as global
+    metadata tags (used to stamp the original file's size/name onto the
+    converted file so it survives even if the DB is lost).
+    """
+    meta_args: list[str] = []
+    for key, value in (metadata or {}).items():
+        meta_args += ["-metadata", f"{key}={value}"]
+
     base = [settings.ffmpeg, "-y", "-hide_banner", "-nostdin"]
 
     # VAAPI needs the hw device declared before the input.
@@ -102,6 +112,7 @@ def build_command(
             "-c:s", "copy",
             "-map_metadata", "0",
             "-map_chapters", "0",
+            *meta_args,
             "-tag:v", "hvc1",
             str(dest),
         ]
@@ -115,6 +126,7 @@ def build_command(
         *video,               # ...then override the video stream
         "-map_metadata", "0",
         "-map_chapters", "0",
+        *meta_args,
         "-tag:v", "hvc1",     # broad player compatibility for HEVC
         str(dest),
     ]
@@ -149,6 +161,7 @@ def transcode(
     preset: str,
     ten_bit: bool,
     duration: float,
+    metadata: dict[str, str] | None = None,
     on_progress: Optional[ProgressCallback] = None,
     process_sink: Optional[Callable[[subprocess.Popen], None]] = None,
 ) -> TranscodeResult:
@@ -158,7 +171,8 @@ def transcode(
     a reference for cancellation.
     """
     cmd = build_command(
-        source, dest, encoder=encoder, crf=crf, preset=preset, ten_bit=ten_bit
+        source, dest, encoder=encoder, crf=crf, preset=preset,
+        ten_bit=ten_bit, metadata=metadata,
     )
     cmd = [*cmd[:-1], "-progress", "pipe:1", "-nostats", cmd[-1]]
 
@@ -236,3 +250,77 @@ def _cleanup(dest: Path) -> None:
             dest.unlink()
     except OSError:
         pass
+
+
+# --------------------------------------------------------------------------
+# VMAF quality scoring
+# --------------------------------------------------------------------------
+_vmaf_available: Optional[bool] = None
+
+
+def vmaf_available() -> bool:
+    """Detect whether this ffmpeg build has the full libvmaf filter (cached)."""
+    global _vmaf_available
+    if _vmaf_available is None:
+        try:
+            out = subprocess.run(
+                [settings.ffmpeg, "-hide_banner", "-filters"],
+                capture_output=True, text=True, timeout=30,
+            )
+            _vmaf_available = " libvmaf " in out.stdout
+        except Exception:
+            _vmaf_available = False
+    return _vmaf_available
+
+
+def compute_vmaf(reference: Path, distorted: Path) -> Optional[float]:
+    """Return the mean VMAF score (0..100) of ``distorted`` vs ``reference``.
+
+    Returns ``None`` if libvmaf isn't available or scoring fails -- VMAF is a
+    best-effort quality report and never blocks a conversion.
+    """
+    if not vmaf_available():
+        return None
+
+    import json
+    import tempfile
+
+    threads = settings.vmaf_threads or 0
+    thread_opt = f":n_threads={threads}" if threads > 0 else ""
+    with tempfile.NamedTemporaryFile(suffix=".json", delete=False) as tmp:
+        log_path = tmp.name
+    try:
+        # Input 0 = distorted (the HEVC output), input 1 = reference (original).
+        lavfi = (
+            f"[0:v][1:v]libvmaf=log_fmt=json:log_path={log_path}{thread_opt}"
+        )
+        proc = subprocess.run(
+            [
+                settings.ffmpeg, "-hide_banner", "-nostdin",
+                "-i", str(distorted),
+                "-i", str(reference),
+                "-lavfi", lavfi,
+                "-f", "null", "-",
+            ],
+            capture_output=True, text=True, timeout=7200,
+        )
+        if proc.returncode != 0:
+            return None
+        with open(log_path) as fh:
+            data = json.load(fh)
+        # Newer libvmaf schema first, then older fallbacks.
+        pooled = data.get("pooled_metrics", {})
+        if "vmaf" in pooled and "mean" in pooled["vmaf"]:
+            return round(float(pooled["vmaf"]["mean"]), 2)
+        if "VMAF score" in data:
+            return round(float(data["VMAF score"]), 2)
+        if "aggregate" in data and "VMAF_score" in data["aggregate"]:
+            return round(float(data["aggregate"]["VMAF_score"]), 2)
+        return None
+    except Exception:
+        return None
+    finally:
+        try:
+            Path(log_path).unlink()
+        except OSError:
+            pass
