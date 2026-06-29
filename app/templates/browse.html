@@ -1,0 +1,93 @@
+{% extends "base.html" %}
+{% block title %}Browse &amp; Convert · Downsizarr{% endblock %}
+{% block nav_browse %}active{% endblock %}
+{% block content %}
+<div class="page-head">
+  <h1>Browse &amp; Convert</h1>
+</div>
+
+<div class="breadcrumb">
+  <a href="/browse">⌂ root</a>
+  {% if current and current != "." %}<span>/</span><span>{{ current }}</span>{% endif %}
+</div>
+
+<form method="post" action="/batches" id="batch-form">
+  <div class="layout">
+    <section class="card filelist">
+      <div class="list-head">
+        <label class="check-all"><input type="checkbox" id="check-all"> select all</label>
+        <button type="button" class="btn ghost"
+                hx-post="/probe" hx-include="#batch-form" hx-target="#probe-out"
+                hx-swap="innerHTML">Probe selected</button>
+      </div>
+
+      {% if parent is not none and (current and current != ".") %}
+        <a class="row dir" href="/browse?path={{ parent }}">⬆ ..</a>
+      {% endif %}
+
+      {% for e in entries %}
+        {% if e.is_dir %}
+          <a class="row dir" href="/browse?path={{ e.rel_path }}">📁 {{ e.name }}</a>
+        {% else %}
+          <label class="row file {% if e.already_hevc %}is-hevc{% endif %}">
+            <input type="checkbox" name="files" value="{{ e.rel_path }}"
+                   class="file-cb" {% if e.already_hevc %}data-hevc="1"{% endif %}>
+            <span class="fname">🎞 {{ e.name }}</span>
+            <span class="fsize">{{ human_bytes(e.size) }}</span>
+            {% if e.already_hevc %}<span class="tag warn">looks HEVC</span>{% endif %}
+          </label>
+        {% endif %}
+      {% endfor %}
+      {% if not entries %}<p class="muted">No folders or video files here.</p>{% endif %}
+
+      <div id="probe-out"></div>
+    </section>
+
+    <aside class="card settings">
+      <h3>Conversion settings</h3>
+
+      <label>Encoder
+        <select name="encoder" id="encoder">
+          {% for enc in encoders %}
+            <option value="{{ enc.value }}" {% if enc.value == default_encoder %}selected{% endif %}>
+              {{ enc.value }}{% if not enc.is_hardware %} (software, best quality){% else %} (hardware){% endif %}
+            </option>
+          {% endfor %}
+        </select>
+      </label>
+
+      <label>Quality (CRF / CQ — lower = better, larger)
+        <input type="number" name="crf" id="crf" min="0" max="51"
+               value="{{ default_crf }}">
+      </label>
+      <input type="range" min="14" max="28" value="{{ default_crf }}"
+             id="crf-range" class="range">
+      <div class="hint">14–18 ≈ visually transparent · 20–23 ≈ smaller</div>
+
+      <label>Preset (slower = better compression)
+        <select name="preset" id="preset" data-initial="{{ default_preset }}"></select>
+      </label>
+
+      <label class="inline">
+        <input type="checkbox" name="ten_bit" value="true"> Encode 10-bit
+        <span class="hint">reduces banding; slightly larger</span>
+      </label>
+
+      <label>Batch limit (max files to enqueue, 0 = all selected)
+        <input type="number" name="limit" min="0" value="0">
+        <span class="hint">Great for QA: select a folder, convert just a few first.</span>
+      </label>
+
+      <label>Note / batch name
+        <input type="text" name="note" placeholder="QA test #1" maxlength="120">
+      </label>
+
+      <button type="submit" class="btn primary wide">
+        Queue conversion (<span id="sel-count">0</span> selected)
+      </button>
+      <p class="hint safe">✔ Originals are never modified. Output is written
+        beside the source as <code>name{{ settings.output_suffix }}{{ '.ext' }}</code>.</p>
+    </aside>
+  </div>
+</form>
+{% endblock %}

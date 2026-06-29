@@ -1,0 +1,53 @@
+<section class="card">
+  <h3>Active ({{ active|length }})</h3>
+  {% if not active %}
+    <p class="muted">Nothing running or queued. <a href="/browse">Add some files →</a></p>
+  {% else %}
+    {% for job in active %}
+    <div class="job">
+      <div class="job-main">
+        <span class="job-name">{{ job.source_path.split('/')|last }}</span>
+        <span class="job-meta">
+          {{ job.source_codec or "?" }} → hevc · {{ job.encoder }} · CRF {{ job.crf }}/{{ job.preset }}
+          · {{ human_bytes(job.source_size) }}
+        </span>
+      </div>
+      <div class="job-side">
+        <span class="badge {{ job.status }}">{{ job.status }}</span>
+        {% if job.status == "running" %}
+          <div class="bar"><div class="bar-fill" style="width: {{ job.progress }}%"></div></div>
+          <span class="pct">{{ job.progress }}%</span>
+        {% endif %}
+        <form method="post" action="/jobs/{{ job.id }}/cancel" class="inline-form">
+          <button class="btn tiny danger" type="submit">Cancel</button>
+        </form>
+      </div>
+    </div>
+    {% endfor %}
+  {% endif %}
+</section>
+
+<section class="card">
+  <h3>Recently finished</h3>
+  {% if not recent %}
+    <p class="muted">No completed jobs yet.</p>
+  {% else %}
+  <table class="tbl">
+    <thead><tr><th>File</th><th>Status</th><th>Original</th><th>New</th><th>Saved</th><th>Info</th></tr></thead>
+    <tbody>
+      {% for job in recent %}
+      <tr>
+        <td>{{ job.source_path.split('/')|last }}</td>
+        <td><span class="badge {{ job.status }}">{{ job.status }}</span></td>
+        <td>{{ human_bytes(job.source_size) }}</td>
+        <td>{% if job.output_size %}{{ human_bytes(job.output_size) }}{% else %}–{% endif %}</td>
+        <td class="{% if job.saved_bytes > 0 %}good{% endif %}">
+          {% if job.status == "completed" %}{{ human_bytes(job.saved_bytes) }}{% else %}–{% endif %}
+        </td>
+        <td class="err">{{ job.error }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% endif %}
+</section>

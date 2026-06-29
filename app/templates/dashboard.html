@@ -1,0 +1,13 @@
+{% extends "base.html" %}
+{% block title %}Dashboard · Downsizarr{% endblock %}
+{% block nav_dash %}active{% endblock %}
+{% block content %}
+<div class="page-head">
+  <h1>Dashboard</h1>
+  <a class="btn primary" href="/browse">+ New conversion batch</a>
+</div>
+
+<div hx-get="/metrics/partial" hx-trigger="load, every 5s" hx-swap="innerHTML">
+  {% include "_stats.html" %}
+</div>
+{% endblock %}

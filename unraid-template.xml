@@ -1,0 +1,43 @@
+<?xml version="1.0"?>
+<Container version="2">
+  <Name>Downsizarr</Name>
+  <Repository>ghcr.io/crescentfreshhh/downsizarr:latest</Repository>
+  <Registry>https://ghcr.io/crescentfreshhh/downsizarr</Registry>
+  <Network>bridge</Network>
+  <Privileged>false</Privileged>
+  <Support/>
+  <Project/>
+  <Overview>
+    Downsizarr batch-transcodes your H264 video library to H265/HEVC to reclaim
+    disk space while preserving quality (libx265 CRF by default, optional
+    NVENC/QSV/VAAPI). Browse your shares from a web GUI, queue small QA batches
+    first, then scale up. Originals are never modified - converted files are
+    written next to the source with a .hevc suffix. Tracks per-file sizes and
+    total space saved over time.
+  </Overview>
+  <Category>MediaApp:Video Tools:</Category>
+  <WebUI>http://[IP]:[PORT:8080]/</WebUI>
+  <Icon>https://raw.githubusercontent.com/crescentfreshhh/downsizarr/main/app/static/icon.png</Icon>
+  <ExtraParams/>
+  <PostArgs/>
+  <DonateText/>
+  <DonateLink/>
+
+  <Config Name="WebUI Port" Target="8080" Default="8080" Mode="tcp" Description="Web interface port" Type="Port" Display="always" Required="true" Mask="false">8080</Config>
+
+  <Config Name="Media Share" Target="/media" Default="/mnt/user/media" Mode="rw" Description="Your media share. Read/write required - converted files are written next to the source." Type="Path" Display="always" Required="true" Mask="false">/mnt/user/media</Config>
+
+  <Config Name="Config / DB" Target="/config" Default="/mnt/user/appdata/downsizarr" Mode="rw" Description="Stores the metrics database and logs." Type="Path" Display="always" Required="true" Mask="false">/mnt/user/appdata/downsizarr</Config>
+
+  <Config Name="Output Suffix" Target="DOWNSIZARR_OUTPUT_SUFFIX" Default=".hevc" Mode="" Description="Inserted before the extension: Movie.mkv -> Movie.hevc.mkv" Type="Variable" Display="always" Required="false" Mask="false">.hevc</Config>
+
+  <Config Name="Max Concurrent" Target="DOWNSIZARR_MAX_CONCURRENT" Default="1" Mode="" Description="How many transcodes run at once. Keep at 1 for QA / libx265 slow." Type="Variable" Display="always" Required="false" Mask="false">1</Config>
+
+  <Config Name="Default Encoder" Target="DOWNSIZARR_DEFAULT_ENCODER" Default="libx265" Mode="" Description="libx265 (software, best quality), hevc_nvenc, hevc_qsv, or hevc_vaapi" Type="Variable" Display="always" Required="false" Mask="false">libx265</Config>
+
+  <Config Name="Default CRF" Target="DOWNSIZARR_DEFAULT_CRF" Default="18" Mode="" Description="Quality target. Lower = higher quality + larger. 18 is visually transparent." Type="Variable" Display="always" Required="false" Mask="false">18</Config>
+
+  <Config Name="Default Preset" Target="DOWNSIZARR_DEFAULT_PRESET" Default="slow" Mode="" Description="libx265 preset. slower = better compression." Type="Variable" Display="advanced" Required="false" Mask="false">slow</Config>
+
+  <Config Name="Intel GPU (QSV/VAAPI)" Target="/dev/dri" Default="/dev/dri" Mode="" Description="Optional: pass through the Intel iGPU for hardware encoding (hevc_qsv / hevc_vaapi)." Type="Device" Display="advanced" Required="false" Mask="false">/dev/dri</Config>
+</Container>

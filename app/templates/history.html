@@ -1,0 +1,37 @@
+{% extends "base.html" %}
+{% block title %}History · Downsizarr{% endblock %}
+{% block nav_history %}active{% endblock %}
+{% block content %}
+<div class="page-head">
+  <h1>Conversion history</h1>
+  <div class="head-stat">Total saved: <strong>{{ human_bytes(stats.total_saved) }}</strong>
+    ({{ "%.1f"|format(stats.percent_saved) }}%)</div>
+</div>
+
+<section class="card">
+  {% if not jobs %}
+    <p class="muted">No completed conversions yet.</p>
+  {% else %}
+  <table class="tbl">
+    <thead>
+      <tr><th>Finished</th><th>File</th><th>Encoder</th><th>CRF</th>
+          <th>Original</th><th>New</th><th>Saved</th><th>%</th></tr>
+    </thead>
+    <tbody>
+      {% for job in jobs %}
+      <tr>
+        <td>{{ job.finished_at.strftime("%Y-%m-%d %H:%M") if job.finished_at else "" }}</td>
+        <td title="{{ job.source_path }}">{{ job.source_path.split('/')|last }}</td>
+        <td>{{ job.encoder }}</td>
+        <td>{{ job.crf }}/{{ job.preset }}</td>
+        <td>{{ human_bytes(job.source_size) }}</td>
+        <td>{{ human_bytes(job.output_size) }}</td>
+        <td class="good">{{ human_bytes(job.saved_bytes) }}</td>
+        <td>{% if job.source_size %}{{ "%.0f"|format(job.saved_bytes / job.source_size * 100) }}%{% else %}–{% endif %}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% endif %}
+</section>
+{% endblock %}

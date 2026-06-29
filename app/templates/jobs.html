@@ -1,0 +1,13 @@
+{% extends "base.html" %}
+{% block title %}Queue · Downsizarr{% endblock %}
+{% block nav_jobs %}active{% endblock %}
+{% block content %}
+<div class="page-head">
+  <h1>Conversion queue</h1>
+  <a class="btn primary" href="/browse">+ Add files</a>
+</div>
+
+<div hx-get="/jobs/partial" hx-trigger="load, every 2s" hx-swap="innerHTML">
+  <p class="muted">Loading…</p>
+</div>
+{% endblock %}

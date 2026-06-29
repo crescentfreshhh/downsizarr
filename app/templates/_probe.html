@@ -1,0 +1,27 @@
+<div class="probe-results">
+  <h4>Probe results</h4>
+  {% if not results %}
+    <p class="muted">Nothing selected, or probing failed.</p>
+  {% else %}
+  <table class="tbl">
+    <thead><tr><th>File</th><th>Codec</th><th>Resolution</th><th>Duration</th><th>Size</th></tr></thead>
+    <tbody>
+      {% for r in results %}
+      <tr class="{% if r.already_hevc %}is-hevc{% endif %}">
+        <td>{{ r.name }}</td>
+        <td>
+          <span class="tag {% if r.already_hevc %}warn{% else %}ok{% endif %}">
+            {{ r.codec or "?" }}
+          </span>
+        </td>
+        <td>{% if r.width %}{{ r.width }}×{{ r.height }}{% else %}–{% endif %}</td>
+        <td>{% if r.duration %}{{ (r.duration / 60)|round(1) }} min{% else %}–{% endif %}</td>
+        <td>{{ human_bytes(r.size) }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  <p class="hint">Files already in HEVC will be <strong>skipped</strong> if their
+    output name already exists, but you can still re-encode if you want.</p>
+  {% endif %}
+</div>

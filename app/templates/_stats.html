@@ -1,0 +1,44 @@
+<div class="stat-grid">
+  <div class="stat hero">
+    <div class="stat-label">Space saved to date</div>
+    <div class="stat-value">{{ human_bytes(stats.total_saved) }}</div>
+    <div class="stat-sub">{{ "%.1f"|format(stats.percent_saved) }}% smaller across {{ stats.completed }} file(s)</div>
+  </div>
+  <div class="stat">
+    <div class="stat-label">Original size</div>
+    <div class="stat-value sm">{{ human_bytes(stats.total_source) }}</div>
+  </div>
+  <div class="stat">
+    <div class="stat-label">New size</div>
+    <div class="stat-value sm">{{ human_bytes(stats.total_output) }}</div>
+  </div>
+  <div class="stat">
+    <div class="stat-label">Converted</div>
+    <div class="stat-value sm">{{ stats.completed }}</div>
+  </div>
+  <div class="stat">
+    <div class="stat-label">Running / Queued</div>
+    <div class="stat-value sm">{{ stats.running }} / {{ stats.queued }}</div>
+  </div>
+  <div class="stat">
+    <div class="stat-label">Failed / Skipped</div>
+    <div class="stat-value sm">{{ stats.failed }} / {{ stats.skipped }}</div>
+  </div>
+</div>
+
+{% if stats.points %}
+<div class="card">
+  <h3>Cumulative space saved</h3>
+  {% set maxv = stats.points[-1][1] if stats.points[-1][1] > 0 else 1 %}
+  <div class="spark">
+    {% for label, value in stats.points %}
+      <div class="spark-bar" style="height: {{ (value / maxv * 100)|round(1) }}%"
+           title="{{ label }}: {{ human_bytes(value) }}"></div>
+    {% endfor %}
+  </div>
+  <div class="spark-axis">
+    <span>{{ stats.points[0][0] }}</span>
+    <span>now · {{ human_bytes(stats.points[-1][1]) }}</span>
+  </div>
+</div>
+{% endif %}

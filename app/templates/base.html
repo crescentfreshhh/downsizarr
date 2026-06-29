@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}Downsizarr{% endblock %}</title>
+  <link rel="stylesheet" href="/static/style.css">
+  <script src="https://unpkg.com/htmx.org@2.0.4" defer></script>
+  <script src="/static/app.js" defer></script>
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="/">⬇ Downsizarr</a>
+    <nav>
+      <a href="/" class="{% block nav_dash %}{% endblock %}">Dashboard</a>
+      <a href="/browse" class="{% block nav_browse %}{% endblock %}">Browse &amp; Convert</a>
+      <a href="/jobs" class="{% block nav_jobs %}{% endblock %}">Queue</a>
+      <a href="/history" class="{% block nav_history %}{% endblock %}">History</a>
+    </nav>
+    <span class="ver">v{{ version }}</span>
+  </header>
+  <main>
+    {% block content %}{% endblock %}
+  </main>
+  <footer class="foot">
+    H264 → H265/HEVC · media root <code>{{ settings.media_root }}</code>
+  </footer>
+</body>
+</html>
