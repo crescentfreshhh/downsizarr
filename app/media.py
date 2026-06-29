@@ -73,9 +73,17 @@ def is_video(path: Path) -> bool:
 
 
 def is_converted_output(path: Path) -> bool:
-    """Heuristic: does this file already carry our output suffix?"""
+    """Heuristic: does this file already carry our output suffix?
+
+    Checks the suffix token anywhere in the dotted stem so tagged outputs
+    (e.g. ``Movie.hevc.nvenc.mkv``) are also recognised, not just
+    ``Movie.hevc.mkv``.
+    """
     suffix = settings.output_suffix
-    return bool(suffix) and path.stem.endswith(suffix)
+    if not suffix:
+        return False
+    token = suffix.strip(".")
+    return token in path.stem.split(".")
 
 
 def collect_videos(folder_rel: str = "", recursive: bool = True) -> list[str]:

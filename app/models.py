@@ -40,6 +40,16 @@ class Encoder(str, Enum):
     def is_hardware(self) -> bool:
         return self != Encoder.LIBX265
 
+    @property
+    def short_tag(self) -> str:
+        """Compact, filename-friendly label for the encode method."""
+        return {
+            Encoder.LIBX265: "x265",
+            Encoder.HEVC_NVENC: "nvenc",
+            Encoder.HEVC_QSV: "qsv",
+            Encoder.HEVC_VAAPI: "vaapi",
+        }[self]
+
 
 class Batch(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
@@ -52,6 +62,8 @@ class Batch(SQLModel, table=True):
     preset: str = "slow"
     ten_bit: bool = False
     compute_vmaf: bool = False
+    tag_encoder: bool = False   # include encode method in the output filename
+    tag_quality: bool = False   # include crf/preset in the output filename
     note: str = ""
 
 

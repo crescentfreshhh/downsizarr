@@ -130,6 +130,8 @@ class JobManager:
             ten_bit = job.ten_bit
             batch = session.get(Batch, job.batch_id) if job.batch_id else None
             want_vmaf = bool(batch.compute_vmaf) if batch else False
+            tag_encoder = bool(batch.tag_encoder) if batch else False
+            tag_quality = bool(batch.tag_quality) if batch else False
 
         if job_id in self._cancel:
             self._finish(job_id, JobStatus.CANCELED)
@@ -173,7 +175,14 @@ class JobManager:
             )
             return
 
-        dest = output_path_for(src)
+        dest = output_path_for(
+            src,
+            encoder=encoder,
+            tag_encoder=tag_encoder,
+            crf=crf,
+            preset=preset,
+            tag_quality=tag_quality,
+        )
         if dest.exists():
             self._finish(
                 job_id,

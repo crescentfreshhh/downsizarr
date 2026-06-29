@@ -98,6 +98,8 @@ def browse(request: Request, path: str = ""):
             "default_crf": settings.default_crf,
             "default_preset": settings.default_preset,
             "default_vmaf": settings.default_vmaf,
+            "default_tag_encoder": settings.tag_encoder,
+            "default_tag_quality": settings.tag_quality,
         },
     )
 
@@ -128,6 +130,8 @@ def create_batch(
     preset: str = Form(default=settings.default_preset),
     ten_bit: bool = Form(default=False),
     compute_vmaf: bool = Form(default=False),
+    tag_encoder: bool = Form(default=False),
+    tag_quality: bool = Form(default=False),
     limit: int = Form(default=0),
     note: str = Form(default=""),
 ):
@@ -167,6 +171,8 @@ def create_batch(
             preset=preset,
             ten_bit=ten_bit,
             compute_vmaf=compute_vmaf,
+            tag_encoder=tag_encoder,
+            tag_quality=tag_quality,
             note=note,
         )
         session.add(batch)

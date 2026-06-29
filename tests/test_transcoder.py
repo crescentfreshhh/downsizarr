@@ -28,6 +28,36 @@ def test_output_path_keeps_directory():
     assert out.name == "ep01.hevc.mp4"
 
 
+def test_output_path_tag_encoder():
+    out = transcoder.output_path_for(
+        Path("/m/Film.mkv"), encoder=Encoder.HEVC_NVENC, tag_encoder=True
+    )
+    assert out.name == "Film.hevc.nvenc.mkv"
+
+
+def test_output_path_tag_quality():
+    out = transcoder.output_path_for(
+        Path("/m/Film.mkv"), crf=18, preset="slow", tag_quality=True
+    )
+    assert out.name == "Film.hevc.crf18-slow.mkv"
+
+
+def test_output_path_tag_both():
+    out = transcoder.output_path_for(
+        Path("/m/Film.mkv"), encoder="libx265", tag_encoder=True,
+        crf=20, preset="medium", tag_quality=True,
+    )
+    assert out.name == "Film.hevc.x265.crf20-medium.mkv"
+
+
+def test_tagged_output_is_recognized_as_converted():
+    # A tagged output must not be re-queued by recursive scans.
+    from app import media
+    assert media.is_converted_output(Path("/m/Film.hevc.nvenc.mkv")) is True
+    assert media.is_converted_output(Path("/m/Film.hevc.mkv")) is True
+    assert media.is_converted_output(Path("/m/Film.mkv")) is False
+
+
 def test_build_command_libx265_quality_flags():
     cmd = transcoder.build_command(
         Path("/in.mkv"), Path("/out.hevc.mkv"),

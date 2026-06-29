@@ -46,6 +46,15 @@ class Settings:
     )
     vmaf_threads: int = int(os.getenv("DOWNSIZARR_VMAF_THREADS", "0"))  # 0 = auto
 
+    # Annotate output filenames with the encode method / quality (handy for
+    # A/B testing encoders before settling on one).
+    tag_encoder: bool = field(
+        default_factory=lambda: _bool("DOWNSIZARR_TAG_ENCODER", False)
+    )
+    tag_quality: bool = field(
+        default_factory=lambda: _bool("DOWNSIZARR_TAG_QUALITY", False)
+    )
+
     ffmpeg: str = os.getenv("DOWNSIZARR_FFMPEG", "ffmpeg")
     ffprobe: str = os.getenv("DOWNSIZARR_FFPROBE", "ffprobe")
 

@@ -113,6 +113,8 @@ All settings are environment variables (see [`.env.example`](.env.example)):
 | `DOWNSIZARR_DEFAULT_VMAF` | `false` | Measure VMAF quality by default (slower). |
 | `DOWNSIZARR_VMAF_THREADS` | `0` | Threads for VMAF scoring (0 = auto). |
 | `DOWNSIZARR_SKIP_ALREADY_HEVC` | `true` | Skip files already in HEVC/H265 instead of re-encoding. |
+| `DOWNSIZARR_TAG_ENCODER` | `false` | Add the encode method to output filenames (`Movie.hevc.nvenc.mkv`). |
+| `DOWNSIZARR_TAG_QUALITY` | `false` | Add the quality to output filenames (`Movie.hevc.crf18-slow.mkv`). |
 | `DOWNSIZARR_DURATION_TOLERANCE` | `1.0` | Max allowed source/output duration drift (s) during verification. |
 | `DOWNSIZARR_VIDEO_EXTENSIONS` | common set | Extensions treated as convertible video. |
 
@@ -139,6 +141,19 @@ into the converted file's container as metadata tags
 `ffprobe -show_entries format_tags`, so the provenance travels with the file
 even if the database is lost. This makes later dedup/accounting work possible
 long after the originals are gone.
+
+### Filename tagging (for comparing encoders)
+
+By default outputs are named `Movie.hevc.mkv`. While you're testing different
+methods, you can tag the filename with what produced it (per batch, or set a
+global default):
+
+- **Tag with encode method** → `Movie.hevc.nvenc.mkv` (or `.x265`, `.qsv`, `.vaapi`)
+- **Tag with quality** → `Movie.hevc.crf18-slow.mkv`
+- **Both** → `Movie.hevc.nvenc.crf18-slow.mkv`
+
+This lets you encode the same source several ways and keep them side by side to
+compare size and VMAF before settling on your preferred method.
 
 ### Quality guidance
 

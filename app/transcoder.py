@@ -30,18 +30,38 @@ class TranscodeResult:
     output_duration: float
 
 
-def output_path_for(source: Path) -> Path:
-    """Derive the destination path: same directory, suffix before extension.
+def output_path_for(
+    source: Path,
+    *,
+    encoder: Encoder | str | None = None,
+    tag_encoder: bool = False,
+    crf: int | None = None,
+    preset: str | None = None,
+    tag_quality: bool = False,
+) -> Path:
+    """Derive the destination path: same directory, identifier before extension.
 
-    ``Movie.mkv`` -> ``Movie.hevc.mkv`` (or a forced container if configured).
+    Default:                ``Movie.mkv`` -> ``Movie.hevc.mkv``
+    With ``tag_encoder``:   ``Movie.hevc.nvenc.mkv``
+    With ``tag_quality``:   ``Movie.hevc.crf18-slow.mkv``
+    Both:                   ``Movie.hevc.nvenc.crf18-slow.mkv``
     """
-    suffix = settings.output_suffix
+    name = f"{source.stem}{settings.output_suffix}"
+
+    if tag_encoder and encoder is not None:
+        enc = encoder if isinstance(encoder, Encoder) else Encoder(encoder)
+        name += f".{enc.short_tag}"
+    if tag_quality and crf is not None:
+        name += f".crf{crf}"
+        if preset:
+            name += f"-{preset}"
+
     ext = source.suffix
     if settings.output_container:
         ext = settings.output_container
         if not ext.startswith("."):
             ext = f".{ext}"
-    return source.with_name(f"{source.stem}{suffix}{ext}")
+    return source.with_name(f"{name}{ext}")
 
 
 def build_command(

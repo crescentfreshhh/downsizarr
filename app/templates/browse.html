@@ -79,6 +79,18 @@
         <span class="hint">scores each output 0–100 vs the original (95+ ≈ transparent). Adds a second pass, so it's slower.</span>
       </label>
 
+      <label class="inline">
+        <input type="checkbox" name="tag_encoder" value="true" id="tag_encoder"
+               {% if default_tag_encoder %}checked{% endif %}> Tag filename with encode method
+        <span class="hint">e.g. <code>Movie{{ settings.output_suffix }}.nvenc.mkv</code> — handy for comparing encoders.</span>
+      </label>
+
+      <label class="inline">
+        <input type="checkbox" name="tag_quality" value="true" id="tag_quality"
+               {% if default_tag_quality %}checked{% endif %}> Tag filename with quality
+        <span class="hint">e.g. <code>Movie{{ settings.output_suffix }}.crf18-slow.mkv</code></span>
+      </label>
+
       <hr class="sep">
       <input type="hidden" name="folder" value="{{ current }}">
       <label class="inline">
