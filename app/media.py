@@ -68,8 +68,17 @@ def remove_within_root(raw: str | Path) -> None:
     target.unlink()
 
 
+# Marker used by the transcoder for in-progress output files; keep in sync.
+TEMP_MARKER_TOKEN = "dzpart"
+
+
+def is_temp_output(path: Path) -> bool:
+    """True for the transcoder's in-progress ``*.dzpart.<ext>`` temp files."""
+    return TEMP_MARKER_TOKEN in path.stem.split(".")
+
+
 def is_video(path: Path) -> bool:
-    return path.suffix.lower() in settings.video_extensions
+    return path.suffix.lower() in settings.video_extensions and not is_temp_output(path)
 
 
 def is_converted_output(path: Path) -> bool:

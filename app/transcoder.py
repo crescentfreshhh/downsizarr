@@ -6,7 +6,9 @@ but the video codec changes. Defaults are tuned for visual transparency.
 """
 from __future__ import annotations
 
+import os
 import subprocess
+import threading
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Callable, Optional
@@ -16,6 +18,11 @@ from .media import ProbeResult, probe
 from .models import Encoder
 
 ProgressCallback = Callable[[float], None]
+
+# Dotted marker inserted into in-progress output filenames (e.g.
+# ``Movie.hevc.dzpart.mkv``). Kept distinctive so it won't collide with real
+# media names, and recognised by :func:`app.media.is_temp_output`.
+TEMP_MARKER = ".dzpart"
 
 
 class TranscodeError(RuntimeError):
@@ -190,8 +197,13 @@ def transcode(
     ``process_sink`` receives the Popen handle so a caller (the worker) can keep
     a reference for cancellation.
     """
+    # Encode to a temporary sibling and atomically rename on success, so a
+    # crash/kill mid-encode can never leave a partial file at the final path
+    # (which the worker would otherwise mistake for a finished conversion). The
+    # marker goes BEFORE the extension so ffmpeg still infers the container.
+    tmp = dest.with_name(f"{dest.stem}{TEMP_MARKER}{dest.suffix}")
     cmd = build_command(
-        source, dest, encoder=encoder, crf=crf, preset=preset,
+        source, tmp, encoder=encoder, crf=crf, preset=preset,
         ten_bit=ten_bit, metadata=metadata,
     )
     cmd = [*cmd[:-1], "-progress", "pipe:1", "-nostats", cmd[-1]]
@@ -205,12 +217,26 @@ def transcode(
             bufsize=1,
         )
     except FileNotFoundError as exc:
+        _cleanup(tmp)
         raise TranscodeError(
             f"ffmpeg not found ('{settings.ffmpeg}'). Is it installed in the "
             f"container/PATH? ({exc})"
         ) from exc
     if process_sink:
         process_sink(proc)
+
+    # Drain stderr on a separate thread so a chatty ffmpeg can never fill the
+    # stderr pipe buffer and deadlock us while we're reading stdout progress.
+    stderr_chunks: list[str] = []
+
+    def _drain_stderr() -> None:
+        if proc.stderr is None:
+            return
+        for line in proc.stderr:
+            stderr_chunks.append(line)
+
+    err_thread = threading.Thread(target=_drain_stderr, daemon=True)
+    err_thread.start()
 
     assert proc.stdout is not None
     for line in proc.stdout:
@@ -219,20 +245,24 @@ def transcode(
             on_progress(pct)
 
     proc.wait()
-    stderr = proc.stderr.read() if proc.stderr else ""
+    err_thread.join(timeout=5)
+    stderr = "".join(stderr_chunks)
 
     if proc.returncode != 0:
-        _cleanup(dest)
+        _cleanup(tmp)
         if proc.returncode < 0:
             raise TranscodeError("Transcode canceled")
         tail = "\n".join(stderr.strip().splitlines()[-15:])
         raise TranscodeError(f"ffmpeg exited {proc.returncode}:\n{tail}")
 
-    if not dest.exists() or dest.stat().st_size == 0:
-        _cleanup(dest)
+    if not tmp.exists() or tmp.stat().st_size == 0:
+        _cleanup(tmp)
         raise TranscodeError("Output file missing or empty after encode")
 
-    verify = _verify(source, dest)
+    # Verify the temp file before promoting it to the final destination.
+    verify = _verify(source, tmp)
+    os.replace(tmp, dest)
+
     return TranscodeResult(
         output_path=dest,
         output_size=dest.stat().st_size,

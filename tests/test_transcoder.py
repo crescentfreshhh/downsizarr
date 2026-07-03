@@ -50,6 +50,29 @@ def test_output_path_tag_both():
     assert out.name == "Film.hevc.x265.crf20-medium.mkv"
 
 
+def test_temp_output_keeps_real_extension_and_is_hidden():
+    from app import media
+    # Marker goes before the extension so ffmpeg still detects the container.
+    dest = Path("/m/Film.hevc.mkv")
+    tmp = dest.with_name(f"{dest.stem}{transcoder.TEMP_MARKER}{dest.suffix}")
+    assert tmp.name == "Film.hevc.dzpart.mkv"
+    assert tmp.suffix == ".mkv"                      # ffmpeg can infer matroska
+    assert media.is_temp_output(tmp) is True
+    assert media.is_video(tmp) is False              # hidden from browse/scan
+    assert media.is_video(dest) is True
+
+
+def test_collect_videos_excludes_temp_files():
+    from app import media
+    from app.config import settings
+    root = settings.media_root / "tmptree"
+    root.mkdir(parents=True, exist_ok=True)
+    (root / "real.mkv").write_bytes(b"x")
+    (root / "real.hevc.dzpart.mkv").write_bytes(b"x")  # in-progress temp
+    found = [Path(f).name for f in media.collect_videos("tmptree", recursive=True)]
+    assert found == ["real.mkv"]
+
+
 def test_tagged_output_is_recognized_as_converted():
     # A tagged output must not be re-queued by recursive scans.
     from app import media
