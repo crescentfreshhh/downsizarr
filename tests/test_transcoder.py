@@ -268,6 +268,36 @@ def test_vmaf_degrades_gracefully(monkeypatch):
     assert transcoder.compute_vmaf(Path("/a.mkv"), Path("/b.mkv")) is None
 
 
+def test_human_duration():
+    from app.metrics import human_duration
+    assert human_duration(None) == "–"
+    assert human_duration(42) == "42s"
+    assert human_duration(90) == "1m 30s"
+    assert human_duration(3720) == "1h 2m"
+    assert human_duration(90000) == "1d 1h"
+
+
+def test_job_elapsed_and_speed_naive_datetimes():
+    # SQLite returns naive datetimes; elapsed/speed must still work.
+    from datetime import datetime
+    from app.models import Job, JobStatus
+    job = Job(
+        status=JobStatus.COMPLETED.value,
+        source_duration=600.0,  # 10 min of video
+        started_at=datetime(2026, 1, 1, 12, 0, 0),
+        finished_at=datetime(2026, 1, 1, 12, 2, 0),  # 120s wall time
+    )
+    assert job.elapsed_seconds == 120.0
+    assert round(job.speed_x, 1) == 5.0   # 600s video / 120s wall = 5× real-time
+
+
+def test_job_elapsed_none_when_not_started():
+    from app.models import Job, JobStatus
+    job = Job(status=JobStatus.QUEUED.value)
+    assert job.elapsed_seconds is None
+    assert job.speed_x is None
+
+
 def test_human_bytes():
     assert human_bytes(0) == "0 B"
     assert human_bytes(1024) == "1.00 KB"

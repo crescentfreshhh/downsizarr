@@ -4,9 +4,12 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 
 from collections import defaultdict
+from typing import Optional
 
+from sqlalchemy import func
 from sqlmodel import select
 
+from .config import settings
 from .database import session_scope
 from .models import Batch, Job, JobStatus
 
@@ -22,6 +25,23 @@ def human_bytes(num: int | float) -> str:
             return f"{sign}{num:.2f} {unit}"
         num /= 1024.0
     return f"{sign}{num:.2f} EB"
+
+
+def human_duration(seconds: float | int | None) -> str:
+    """Compact human duration: '3d 4h', '2h 5m', '18m 20s', '42s'."""
+    if seconds is None:
+        return "–"
+    seconds = int(max(0, seconds))
+    days, rem = divmod(seconds, 86400)
+    hours, rem = divmod(rem, 3600)
+    minutes, secs = divmod(rem, 60)
+    if days:
+        return f"{days}d {hours}h"
+    if hours:
+        return f"{hours}h {minutes}m"
+    if minutes:
+        return f"{minutes}m {secs}s"
+    return f"{secs}s"
 
 
 @dataclass
@@ -79,6 +99,65 @@ def collect() -> Stats:
     if len(stats.points) > 60:
         stats.points = stats.points[-60:]
     return stats
+
+
+@dataclass
+class QueueEstimate:
+    remaining_jobs: int = 0
+    remaining_bytes: int = 0
+    eta_seconds: Optional[float] = None   # None = not enough data yet
+    avg_speed_x: Optional[float] = None   # mean encode speed (× real-time)
+    sample_size: int = 0                  # completed jobs the estimate is from
+
+
+def queue_estimate(sample: int = 50) -> QueueEstimate:
+    """Estimate remaining encode time for everything queued/running.
+
+    Rate is derived from a small sample of recently completed jobs
+    (wall-time per source byte, which naturally scales with 4K vs 1080p), then
+    applied to the total bytes still to process, divided by the concurrency.
+    """
+    est = QueueEstimate()
+    active = [JobStatus.QUEUED.value, JobStatus.RUNNING.value]
+    with session_scope() as session:
+        recent = session.exec(
+            select(Job)
+            .where(Job.status == JobStatus.COMPLETED.value)
+            .order_by(Job.finished_at.desc())
+            .limit(sample)
+        ).all()
+        est.remaining_jobs = int(
+            session.execute(
+                select(func.count(Job.id)).where(Job.status.in_(active))
+            ).scalar() or 0
+        )
+        est.remaining_bytes = int(
+            session.execute(
+                select(func.coalesce(func.sum(Job.source_size), 0)).where(
+                    Job.status.in_(active)
+                )
+            ).scalar() or 0
+        )
+
+    sum_elapsed = 0.0
+    sum_bytes = 0
+    speeds: list[float] = []
+    for job in recent:
+        elapsed = job.elapsed_seconds
+        if elapsed and elapsed > 0 and job.source_size > 0:
+            sum_elapsed += elapsed
+            sum_bytes += job.source_size
+        if job.speed_x:
+            speeds.append(job.speed_x)
+
+    est.sample_size = len(recent)
+    if speeds:
+        est.avg_speed_x = sum(speeds) / len(speeds)
+    if sum_bytes > 0 and est.remaining_bytes > 0:
+        rate = sum_elapsed / sum_bytes                      # seconds per byte
+        concurrency = max(1, settings.max_concurrent)
+        est.eta_seconds = rate * est.remaining_bytes / concurrency
+    return est
 
 
 @dataclass

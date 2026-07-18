@@ -36,6 +36,7 @@ def _vmaf_class(score) -> str:
 
 
 templates.env.globals["human_bytes"] = metrics.human_bytes
+templates.env.globals["human_duration"] = metrics.human_duration
 templates.env.globals["vmaf_class"] = _vmaf_class
 templates.env.globals["version"] = __version__
 templates.env.globals["encoders"] = list(Encoder)
@@ -216,16 +217,48 @@ def jobs_page(request: Request):
     return templates.TemplateResponse("jobs.html", {"request": request})
 
 
+QUEUE_PREVIEW = 15  # how many queued jobs to render before summarising the rest
+
+
 @app.get("/jobs/partial", response_class=HTMLResponse)
 def jobs_partial(request: Request):
-    active_states = {JobStatus.QUEUED.value, JobStatus.RUNNING.value}
+    """Scale-safe queue view: never renders more than a handful of rows even if
+    thousands of jobs are queued. Heavy counts are done in SQL."""
+    from sqlalchemy import func
+
     with session_scope() as session:
-        rows = session.exec(select(Job).order_by(Job.id.desc())).all()
-        active = [j for j in rows if j.status in active_states]
-        recent = [j for j in rows if j.status not in active_states][:25]
+        running = session.exec(
+            select(Job).where(Job.status == JobStatus.RUNNING.value).order_by(Job.id)
+        ).all()
+        queued_preview = session.exec(
+            select(Job)
+            .where(Job.status == JobStatus.QUEUED.value)
+            .order_by(Job.id)
+            .limit(QUEUE_PREVIEW)
+        ).all()
+        queued_total = int(
+            session.execute(
+                select(func.count(Job.id)).where(Job.status == JobStatus.QUEUED.value)
+            ).scalar() or 0
+        )
+        recent = session.exec(
+            select(Job)
+            .where(Job.status.notin_([JobStatus.QUEUED.value, JobStatus.RUNNING.value]))
+            .order_by(Job.finished_at.desc())
+            .limit(25)
+        ).all()
+    est = metrics.queue_estimate()
     return templates.TemplateResponse(
         "_queue.html",
-        {"request": request, "active": active, "recent": recent},
+        {
+            "request": request,
+            "running": running,
+            "queued_preview": queued_preview,
+            "queued_total": queued_total,
+            "queued_hidden": max(0, queued_total - len(queued_preview)),
+            "recent": recent,
+            "est": est,
+        },
     )
 
 

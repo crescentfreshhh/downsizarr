@@ -125,3 +125,26 @@ class Job(SQLModel, table=True):
         if self.status == JobStatus.COMPLETED.value and self.output_size:
             return self.source_size - self.output_size
         return 0
+
+    @property
+    def elapsed_seconds(self) -> Optional[float]:
+        """Wall-clock encode time. For a running job, time so far.
+
+        SQLite hands datetimes back naive, so we coerce both ends to UTC before
+        subtracting to avoid aware/naive mix-ups.
+        """
+        if not self.started_at:
+            return None
+        end = self.finished_at or utcnow()
+        start = self.started_at
+        start = start if start.tzinfo else start.replace(tzinfo=timezone.utc)
+        end = end if end.tzinfo else end.replace(tzinfo=timezone.utc)
+        return max(0.0, (end - start).total_seconds())
+
+    @property
+    def speed_x(self) -> Optional[float]:
+        """Encode speed as a multiple of real-time (video secs per wall sec)."""
+        elapsed = self.elapsed_seconds
+        if elapsed and elapsed > 0 and self.source_duration and self.source_duration > 0:
+            return self.source_duration / elapsed
+        return None

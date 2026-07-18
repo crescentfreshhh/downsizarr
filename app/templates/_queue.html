@@ -1,29 +1,71 @@
 <section class="card">
-  <h3>Active ({{ active|length }})</h3>
-  {% if not active %}
+  <div class="queue-eta">
+    <div>
+      <span class="eta-label">Remaining</span>
+      <span class="eta-value">{{ est.remaining_jobs }} job(s)</span>
+      <span class="eta-sub">{{ human_bytes(est.remaining_bytes) }} to process</span>
+    </div>
+    <div>
+      <span class="eta-label">Est. time left</span>
+      <span class="eta-value">
+        {% if est.eta_seconds is not none %}{{ human_duration(est.eta_seconds) }}{% else %}—{% endif %}
+      </span>
+      <span class="eta-sub">
+        {% if est.eta_seconds is not none %}
+          at current pace{% if est.avg_speed_x %} · ~{{ "%.1f"|format(est.avg_speed_x) }}× real-time{% endif %}
+        {% else %}
+          finish a few jobs to estimate
+        {% endif %}
+      </span>
+    </div>
+  </div>
+</section>
+
+<section class="card">
+  <h3>Running &amp; up next</h3>
+  {% if not running and not queued_preview %}
     <p class="muted">Nothing running or queued. <a href="/browse">Add some files →</a></p>
   {% else %}
-    {% for job in active %}
+    {% for job in running %}
     <div class="job">
       <div class="job-main">
         <span class="job-name">{{ job.source_path.split('/')|last }}</span>
         <span class="job-meta">
           {{ job.source_codec or "?" }} → hevc · {{ job.encoder }} · CRF {{ job.crf }}/{{ job.preset }}
           · {{ human_bytes(job.source_size) }}
+          {% if job.elapsed_seconds %}· {{ human_duration(job.elapsed_seconds) }} elapsed{% endif %}
+          {% if job.speed_x %}· {{ "%.1f"|format(job.speed_x) }}× real-time{% endif %}
         </span>
       </div>
       <div class="job-side">
         <span class="badge {{ job.status }}">{{ job.status }}</span>
-        {% if job.status == "running" %}
-          <div class="bar"><div class="bar-fill" style="width: {{ job.progress }}%"></div></div>
-          <span class="pct">{{ job.progress }}%</span>
-        {% endif %}
+        <div class="bar"><div class="bar-fill" style="width: {{ job.progress }}%"></div></div>
+        <span class="pct">{{ job.progress }}%</span>
         <form method="post" action="/jobs/{{ job.id }}/cancel" class="inline-form">
           <button class="btn tiny danger" type="submit">Cancel</button>
         </form>
       </div>
     </div>
     {% endfor %}
+
+    {% for job in queued_preview %}
+    <div class="job queued-row">
+      <div class="job-main">
+        <span class="job-name">{{ job.source_path.split('/')|last }}</span>
+        <span class="job-meta">{{ job.encoder }} · CRF {{ job.crf }}/{{ job.preset }} · {{ human_bytes(job.source_size) }}</span>
+      </div>
+      <div class="job-side">
+        <span class="badge queued">queued</span>
+        <form method="post" action="/jobs/{{ job.id }}/cancel" class="inline-form">
+          <button class="btn tiny danger" type="submit">Cancel</button>
+        </form>
+      </div>
+    </div>
+    {% endfor %}
+
+    {% if queued_hidden > 0 %}
+    <p class="muted queue-more">…and {{ queued_hidden }} more queued.</p>
+    {% endif %}
   {% endif %}
 </section>
 
@@ -33,7 +75,7 @@
     <p class="muted">No completed jobs yet.</p>
   {% else %}
   <table class="tbl">
-    <thead><tr><th>File</th><th>Status</th><th>Original</th><th>New</th><th>Saved</th><th>Info</th></tr></thead>
+    <thead><tr><th>File</th><th>Status</th><th>Original</th><th>New</th><th>Saved</th><th>Time</th><th>Speed</th><th>VMAF</th><th>Info</th></tr></thead>
     <tbody>
       {% for job in recent %}
       <tr>
@@ -44,6 +86,9 @@
         <td class="{% if job.saved_bytes > 0 %}good{% endif %}">
           {% if job.status == "completed" %}{{ human_bytes(job.saved_bytes) }}{% else %}–{% endif %}
         </td>
+        <td>{% if job.status == "completed" and job.elapsed_seconds %}{{ human_duration(job.elapsed_seconds) }}{% else %}–{% endif %}</td>
+        <td>{% if job.status == "completed" and job.speed_x %}{{ "%.1f"|format(job.speed_x) }}×{% else %}–{% endif %}</td>
+        <td class="{{ vmaf_class(job.vmaf_score) }}">{% if job.vmaf_score is not none %}{{ job.vmaf_score }}{% else %}–{% endif %}</td>
         <td class="err">{{ job.error }}</td>
       </tr>
       {% endfor %}

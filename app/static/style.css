@@ -133,6 +133,15 @@ main { max-width: 1100px; margin: 0 auto; padding: 26px 22px 60px; }
 .pct { font-variant-numeric: tabular-nums; font-size: .82rem; width: 44px; text-align: right; }
 .inline-form { display: inline; }
 
+/* Queue ETA banner */
+.queue-eta { display: flex; gap: 40px; flex-wrap: wrap; }
+.queue-eta > div { display: flex; flex-direction: column; }
+.eta-label { color: var(--muted); font-size: .72rem; text-transform: uppercase; letter-spacing: .04em; }
+.eta-value { font-size: 1.5rem; font-weight: 700; }
+.eta-sub { color: var(--muted); font-size: .8rem; }
+.queued-row { opacity: .75; }
+.queue-more { margin: 6px 2px 0; font-size: .85rem; }
+
 .badge { font-size: .72rem; padding: 2px 9px; border-radius: 20px; text-transform: capitalize; }
 .badge.running { background: #14304d; color: #6cb6ff; }
 .badge.queued { background: #2a2f3a; color: var(--muted); }
