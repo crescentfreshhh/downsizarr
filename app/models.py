@@ -50,6 +50,21 @@ class Encoder(str, Enum):
             Encoder.HEVC_VAAPI: "vaapi",
         }[self]
 
+    @property
+    def display_name(self) -> str:
+        """Human-friendly label for the GUI dropdown (CPU vs which GPU)."""
+        return {
+            Encoder.LIBX265: "CPU — libx265 (software, best quality)",
+            Encoder.HEVC_NVENC: "NVIDIA GPU — NVENC / CUDA",
+            Encoder.HEVC_QSV: "Intel GPU — QuickSync (QSV)",
+            Encoder.HEVC_VAAPI: "Intel/AMD GPU — VAAPI",
+        }[self]
+
+    @property
+    def supports_cuda_decode(self) -> bool:
+        """Only the NVIDIA encoder can consume full-CUDA (GPU-decoded) frames."""
+        return self == Encoder.HEVC_NVENC
+
 
 class Batch(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
@@ -64,6 +79,7 @@ class Batch(SQLModel, table=True):
     compute_vmaf: bool = False
     tag_encoder: bool = False   # include encode method in the output filename
     tag_quality: bool = False   # include crf/preset in the output filename
+    gpu_decode: bool = False    # full CUDA pipeline (GPU decode) for NVENC
     note: str = ""
 
 

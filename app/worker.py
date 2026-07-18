@@ -132,6 +132,7 @@ class JobManager:
             want_vmaf = bool(batch.compute_vmaf) if batch else False
             tag_encoder = bool(batch.tag_encoder) if batch else False
             tag_quality = bool(batch.tag_quality) if batch else False
+            gpu_decode = bool(batch.gpu_decode) if batch else False
 
         if job_id in self._cancel:
             self._finish(job_id, JobStatus.CANCELED)
@@ -224,6 +225,7 @@ class JobManager:
                 preset=preset,
                 ten_bit=ten_bit,
                 duration=duration,
+                gpu_decode=gpu_decode,
                 metadata=metadata,
                 on_progress=on_progress,
                 process_sink=sink,

@@ -46,14 +46,21 @@
     <aside class="card settings">
       <h3>Conversion settings</h3>
 
-      <label>Encoder
+      <label>Encoder (CPU vs GPU)
         <select name="encoder" id="encoder">
           {% for enc in encoders %}
             <option value="{{ enc.value }}" {% if enc.value == default_encoder %}selected{% endif %}>
-              {{ enc.value }}{% if not enc.is_hardware %} (software, best quality){% else %} (hardware){% endif %}
+              {{ enc.display_name }}
             </option>
           {% endfor %}
         </select>
+        <span class="hint">CPU = best quality/size. GPU (NVENC/QSV/VAAPI) = much faster. Set this per run.</span>
+      </label>
+
+      <label class="inline" id="gpu-decode-row">
+        <input type="checkbox" name="gpu_decode" value="true" id="gpu_decode"
+               {% if default_gpu_decode %}checked{% endif %}> GPU decode (full CUDA pipeline)
+        <span class="hint">NVIDIA only: decode <em>and</em> encode on the GPU for max speed / low CPU. Off = GPU encodes, CPU decodes (more compatible). Try both to see what's best for your library.</span>
       </label>
 
       <label>Quality (CRF / CQ — lower = better, larger)

@@ -27,6 +27,14 @@
     preset.dataset.initial = "";
   }
 
+  // The GPU-decode (full CUDA) toggle only applies to the NVIDIA encoder.
+  function syncGpuDecode() {
+    const enc = document.getElementById("encoder");
+    const row = document.getElementById("gpu-decode-row");
+    if (!enc || !row) return;
+    row.style.display = enc.value === "hevc_nvenc" ? "" : "none";
+  }
+
   function syncCrf() {
     const num = document.getElementById("crf");
     const range = document.getElementById("crf-range");
@@ -57,7 +65,9 @@
       // The preset <select> carries data-initial="<server default>" so the
       // first fill selects it; afterwards we fall back to per-encoder defaults.
       enc.addEventListener("change", fillPresets);
+      enc.addEventListener("change", syncGpuDecode);
       fillPresets();
+      syncGpuDecode();
     }
     syncCrf();
     countSelected();

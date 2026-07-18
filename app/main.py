@@ -100,6 +100,7 @@ def browse(request: Request, path: str = ""):
             "default_vmaf": settings.default_vmaf,
             "default_tag_encoder": settings.tag_encoder,
             "default_tag_quality": settings.tag_quality,
+            "default_gpu_decode": settings.default_gpu_decode,
         },
     )
 
@@ -132,6 +133,7 @@ def create_batch(
     compute_vmaf: bool = Form(default=False),
     tag_encoder: bool = Form(default=False),
     tag_quality: bool = Form(default=False),
+    gpu_decode: bool = Form(default=False),
     limit: int = Form(default=0),
     note: str = Form(default=""),
 ):
@@ -173,6 +175,7 @@ def create_batch(
             compute_vmaf=compute_vmaf,
             tag_encoder=tag_encoder,
             tag_quality=tag_quality,
+            gpu_decode=gpu_decode,
             note=note,
         )
         session.add(batch)

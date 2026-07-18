@@ -107,7 +107,8 @@ All settings are environment variables (see [`.env.example`](.env.example)):
 | `DOWNSIZARR_OUTPUT_SUFFIX` | `.hevc` | Suffix before the extension on outputs. |
 | `DOWNSIZARR_OUTPUT_CONTAINER` | *(empty)* | Force an output container, e.g. `mkv`. Empty = keep source. |
 | `DOWNSIZARR_MAX_CONCURRENT` | `1` | Simultaneous transcodes. Keep at 1 for QA / `libx265 slow`. |
-| `DOWNSIZARR_DEFAULT_ENCODER` | `libx265` | `libx265`, `hevc_nvenc`, `hevc_qsv`, `hevc_vaapi`. |
+| `DOWNSIZARR_DEFAULT_ENCODER` | `libx265` | `libx265` (CPU), `hevc_nvenc` (NVIDIA), `hevc_qsv`, `hevc_vaapi`. |
+| `DOWNSIZARR_DEFAULT_GPU_DECODE` | `false` | Default the full CUDA pipeline (GPU decode) on for NVENC batches. |
 | `DOWNSIZARR_DEFAULT_CRF` | `18` | Quality target (lower = better/larger). |
 | `DOWNSIZARR_DEFAULT_PRESET` | `slow` | Encoder preset. |
 | `DOWNSIZARR_DEFAULT_VMAF` | `false` | Measure VMAF quality by default (slower). |
@@ -164,18 +165,41 @@ compare size and VMAF before settling on your preferred method.
   the cost of time. For QA on a CPU, `slow` is a sensible balance.
 - **10-bit** — optional toggle; reduces banding, slightly larger files.
 
-## Hardware encoding
+## Encoders: CPU vs GPU (choose per run)
 
-Software `libx265` gives the best quality-per-byte and works everywhere with no
-special setup. Hardware encoders are much faster but trade some efficiency.
+The **Encoder** dropdown on the Browse page is set on every batch, so you can
+pick CPU or a GPU per run and compare:
+
+| Encoder | Hardware | Notes |
+|---|---|---|
+| `libx265` | **CPU** | Best quality-per-byte. Slowest. The quality benchmark. |
+| `hevc_nvenc` | **NVIDIA GPU (CUDA)** | Very fast, low CPU. Slightly less efficient per bitrate. |
+| `hevc_qsv` | **Intel GPU** | QuickSync; fast on Intel iGPUs. |
+| `hevc_vaapi` | **Intel/AMD GPU** | VAAPI path. |
+
+### NVIDIA CUDA options
+
+For the NVIDIA encoder there's a per-run **GPU decode (full CUDA pipeline)**
+toggle:
+
+- **Off (encode-only):** the GPU encodes but the CPU decodes the source. Most
+  compatible with unusual source formats.
+- **On (full CUDA):** frames are decoded *and* encoded on the GPU
+  (`-hwaccel cuda -hwaccel_output_format cuda`) — fastest and lowest CPU. A few
+  exotic source formats can't be GPU-decoded; for those, turn it off.
+
+Try both on a couple of files to see what's fastest/most reliable for your
+library. Set a global default with `DOWNSIZARR_DEFAULT_GPU_DECODE`.
+
+### Enabling GPU passthrough
 
 - **Intel QSV / VAAPI** — pass the iGPU through: add `/dev/dri:/dev/dri`
   (uncomment the `devices:` block in `docker-compose.yml`, or add the device in
   the Unraid template). The bundled image already includes the Intel VA drivers.
-- **NVIDIA NVENC** — requires the host to have NVIDIA drivers +
-  `nvidia-container-toolkit`, the container started with GPU access, and an
-  `ffmpeg` build with `hevc_nvenc`. The default Debian `ffmpeg` in the image
-  does not include NVENC; use an NVIDIA-enabled base/ffmpeg for that path.
+- **NVIDIA NVENC / CUDA** — install `nvidia-container-toolkit` on the host and
+  start the container with GPU access (`--gpus all` / the nvidia runtime). The
+  bundled ffmpeg (static BtbN build) already includes `hevc_nvenc` and CUDA, so
+  no custom ffmpeg is needed.
 
 ## How conversion works
 

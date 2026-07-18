@@ -54,6 +54,10 @@ class Settings:
     tag_quality: bool = field(
         default_factory=lambda: _bool("DOWNSIZARR_TAG_QUALITY", False)
     )
+    # Default the full-CUDA (GPU decode) pipeline on for NVENC batches.
+    default_gpu_decode: bool = field(
+        default_factory=lambda: _bool("DOWNSIZARR_DEFAULT_GPU_DECODE", False)
+    )
 
     ffmpeg: str = os.getenv("DOWNSIZARR_FFMPEG", "ffmpeg")
     ffprobe: str = os.getenv("DOWNSIZARR_FFPROBE", "ffprobe")

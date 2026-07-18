@@ -103,6 +103,41 @@ def test_build_command_nvenc_uses_cq():
     )
     assert "hevc_nvenc" in cmd
     assert cmd[cmd.index("-cq") + 1] == "20"
+    # Encode-only by default: no CUDA decode flags.
+    assert "-hwaccel" not in cmd
+
+
+def test_build_command_nvenc_full_cuda_pipeline():
+    cmd = transcoder.build_command(
+        Path("/in.mkv"), Path("/out.mkv"),
+        encoder=Encoder.HEVC_NVENC, crf=20, preset="p7", gpu_decode=True,
+    )
+    # Full CUDA: GPU decode flags come before the input.
+    assert cmd[cmd.index("-hwaccel") + 1] == "cuda"
+    assert cmd[cmd.index("-hwaccel_output_format") + 1] == "cuda"
+    assert cmd.index("-hwaccel") < cmd.index("-i")
+    assert "hevc_nvenc" in cmd
+
+
+def test_gpu_decode_ignored_for_non_nvidia_encoders():
+    # gpu_decode only applies to NVENC; libx265 must not get CUDA flags.
+    cmd = transcoder.build_command(
+        Path("/in.mkv"), Path("/out.mkv"),
+        encoder=Encoder.LIBX265, crf=18, preset="slow", gpu_decode=True,
+    )
+    assert "-hwaccel" not in cmd
+    assert "libx265" in cmd
+
+
+def test_nvenc_ten_bit_uses_profile_under_cuda():
+    cmd = transcoder.build_command(
+        Path("/in.mkv"), Path("/out.mkv"),
+        encoder=Encoder.HEVC_NVENC, crf=20, preset="p7",
+        ten_bit=True, gpu_decode=True,
+    )
+    # On the GPU we can't apply a CPU -pix_fmt; 10-bit comes via the profile.
+    assert cmd[cmd.index("-profile:v") + 1] == "main10"
+    assert "-pix_fmt" not in cmd
 
 
 def test_build_command_vaapi_uploads_frames():
