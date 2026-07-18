@@ -11,12 +11,20 @@ services:
       - DOWNSIZARR_DATA_DIR=/config
       - DOWNSIZARR_OUTPUT_SUFFIX=.hevc
       - DOWNSIZARR_MAX_CONCURRENT=1
-      - DOWNSIZARR_DEFAULT_ENCODER=libx265
+      # GPU-first defaults (NVIDIA NVENC + full CUDA pipeline):
+      - DOWNSIZARR_DEFAULT_ENCODER=hevc_nvenc
       - DOWNSIZARR_DEFAULT_CRF=18
-      - DOWNSIZARR_DEFAULT_PRESET=slow
+      - DOWNSIZARR_DEFAULT_PRESET=p7
+      - DOWNSIZARR_DEFAULT_GPU_DECODE=true
       # Match these to your Unraid user so output files get sane ownership:
       - PUID=99
       - PGID=100
+      # --- NVIDIA GPU access ---
+      - NVIDIA_VISIBLE_DEVICES=all
+      - NVIDIA_DRIVER_CAPABILITIES=all
+    # NVIDIA runtime (requires nvidia-container-toolkit on the host). The
+    # bundled ffmpeg already includes nvenc + CUDA.
+    runtime: nvidia
     volumes:
       # Point this at your Unraid media share. Use the SAME path your other
       # apps use so paths line up. Read/write is required (output is written
@@ -24,17 +32,9 @@ services:
       - /mnt/user/media:/media
       # Persists the metrics DB + logs across restarts.
       - ./config:/config
-    # --- Hardware encoding (Intel QSV / VAAPI) ---
-    # Uncomment to pass the iGPU through for hevc_qsv / hevc_vaapi:
+    # --- Intel QSV / VAAPI instead of NVIDIA? ---
+    # Remove the `runtime: nvidia` line and the NVIDIA_* env vars above, set
+    # DOWNSIZARR_DEFAULT_ENCODER=hevc_qsv (or hevc_vaapi), and pass the iGPU:
     # devices:
     #   - /dev/dri:/dev/dri
-    # --- Hardware encoding (NVIDIA NVENC) ---
-    # The bundled ffmpeg already includes nvenc; you just need
-    # nvidia-container-toolkit on the host. Uncomment and run with the nvidia
-    # runtime:
-    # deploy:
-    #   resources:
-    #     reservations:
-    #       devices:
-    #         - capabilities: [gpu]
     restart: unless-stopped

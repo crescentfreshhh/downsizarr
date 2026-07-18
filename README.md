@@ -22,11 +22,11 @@ holds up. Downsizarr is built around a **quality-first, QA-first** workflow.
 - **Web GUI** — browse Unraid shares, multi-select files, set a batch limit, go.
 - **Quality preserved** — only the *video* stream is re-encoded; audio,
   subtitles, chapters, attachments and metadata are copied byte-for-byte.
-- **CRF-based encoding** — default `libx265` CRF 18 / `slow` (visually
-  transparent). Fully tunable per batch.
-- **Software *and* hardware encoders** — `libx265` (best quality) plus
-  `hevc_nvenc` (NVIDIA), `hevc_qsv` (Intel QuickSync), `hevc_vaapi`. Selectable
-  per batch in the GUI.
+- **GPU-first, CPU-capable** — defaults to NVIDIA **`hevc_nvenc` / CUDA** (CQ 18
+  / p7) for speed on large libraries; switch any batch to **`libx265`** (CPU,
+  best quality-per-byte), `hevc_qsv`, or `hevc_vaapi`. Fully tunable per batch.
+- **Encode time / speed + queue ETA** — per-file encode time and ×real-time
+  speed, plus an estimated time-remaining for the whole queue.
 - **Safe by design** — originals are never touched. Output is verified after
   encode (must be HEVC and match the source duration) before it counts as done;
   failed/partial outputs are cleaned up. Existing outputs are skipped.
@@ -107,10 +107,10 @@ All settings are environment variables (see [`.env.example`](.env.example)):
 | `DOWNSIZARR_OUTPUT_SUFFIX` | `.hevc` | Suffix before the extension on outputs. |
 | `DOWNSIZARR_OUTPUT_CONTAINER` | *(empty)* | Force an output container, e.g. `mkv`. Empty = keep source. |
 | `DOWNSIZARR_MAX_CONCURRENT` | `1` | Simultaneous transcodes. Keep at 1 for QA / `libx265 slow`. |
-| `DOWNSIZARR_DEFAULT_ENCODER` | `libx265` | `libx265` (CPU), `hevc_nvenc` (NVIDIA), `hevc_qsv`, `hevc_vaapi`. |
-| `DOWNSIZARR_DEFAULT_GPU_DECODE` | `false` | Default the full CUDA pipeline (GPU decode) on for NVENC batches. |
+| `DOWNSIZARR_DEFAULT_ENCODER` | `hevc_nvenc` | `hevc_nvenc` (NVIDIA GPU, default), `libx265` (CPU), `hevc_qsv`, `hevc_vaapi`. |
+| `DOWNSIZARR_DEFAULT_GPU_DECODE` | `true` | Default the full CUDA pipeline (GPU decode) on for NVENC batches. |
 | `DOWNSIZARR_DEFAULT_CRF` | `18` | Quality target (lower = better/larger). |
-| `DOWNSIZARR_DEFAULT_PRESET` | `slow` | Encoder preset. |
+| `DOWNSIZARR_DEFAULT_PRESET` | `p7` | Encoder preset. NVENC: p1–p7. libx265: ultrafast–veryslow. |
 | `DOWNSIZARR_DEFAULT_VMAF` | `false` | Measure VMAF quality by default (slower). |
 | `DOWNSIZARR_VMAF_THREADS` | `0` | Threads for VMAF scoring (0 = auto). |
 | `DOWNSIZARR_SKIP_ALREADY_HEVC` | `true` | Skip files already in HEVC/H265 instead of re-encoding. |

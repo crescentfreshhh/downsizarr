@@ -34,9 +34,12 @@ class Settings:
     output_container: str = os.getenv("DOWNSIZARR_OUTPUT_CONTAINER", "").strip()
     max_concurrent: int = int(os.getenv("DOWNSIZARR_MAX_CONCURRENT", "1"))
 
-    default_encoder: str = os.getenv("DOWNSIZARR_DEFAULT_ENCODER", "libx265")
+    # GPU-first defaults: NVIDIA NVENC with the full CUDA pipeline. p7 is
+    # NVENC's highest-quality preset; CQ 18 is a high-quality target. Override
+    # to libx265 / slow if you'd rather default to CPU.
+    default_encoder: str = os.getenv("DOWNSIZARR_DEFAULT_ENCODER", "hevc_nvenc")
     default_crf: int = int(os.getenv("DOWNSIZARR_DEFAULT_CRF", "18"))
-    default_preset: str = os.getenv("DOWNSIZARR_DEFAULT_PRESET", "slow")
+    default_preset: str = os.getenv("DOWNSIZARR_DEFAULT_PRESET", "p7")
     default_vmaf: bool = field(
         default_factory=lambda: _bool("DOWNSIZARR_DEFAULT_VMAF", False)
     )
@@ -56,7 +59,7 @@ class Settings:
     )
     # Default the full-CUDA (GPU decode) pipeline on for NVENC batches.
     default_gpu_decode: bool = field(
-        default_factory=lambda: _bool("DOWNSIZARR_DEFAULT_GPU_DECODE", False)
+        default_factory=lambda: _bool("DOWNSIZARR_DEFAULT_GPU_DECODE", True)
     )
 
     ffmpeg: str = os.getenv("DOWNSIZARR_FFMPEG", "ffmpeg")

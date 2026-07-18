@@ -9,16 +9,21 @@
   <Project/>
   <Overview>
     Downsizarr batch-transcodes your H264 video library to H265/HEVC to reclaim
-    disk space while preserving quality (libx265 CRF by default, optional
-    NVENC/QSV/VAAPI). Browse your shares from a web GUI, queue small QA batches
-    first, then scale up. Originals are never modified - converted files are
-    written next to the source with a .hevc suffix. Tracks per-file sizes and
-    total space saved over time.
+    disk space while preserving quality. GPU-first by default (NVIDIA NVENC /
+    CUDA), with CPU libx265 and Intel QSV/VAAPI also selectable per run. Browse
+    your shares from a web GUI, queue small QA batches first, then scale up.
+    Shows per-file encode time/speed and a queue ETA. Originals are never
+    modified - converted files are written next to the source with a .hevc
+    suffix. Tracks per-file sizes and total space saved over time.
+
+    NVIDIA GPU: requires the Unraid "Nvidia Driver" plugin. This template adds
+    --runtime=nvidia; set NVIDIA_VISIBLE_DEVICES to your GPU UUID (from the
+    Nvidia Driver plugin page) or leave it as "all".
   </Overview>
   <Category>MediaApp:Video Tools:</Category>
   <WebUI>http://[IP]:[PORT:8080]/</WebUI>
   <Icon>https://raw.githubusercontent.com/crescentfreshhh/downsizarr/main/app/static/icon.png</Icon>
-  <ExtraParams/>
+  <ExtraParams>--runtime=nvidia</ExtraParams>
   <PostArgs/>
   <DonateText/>
   <DonateLink/>
@@ -29,15 +34,21 @@
 
   <Config Name="Config / DB" Target="/config" Default="/mnt/user/appdata/downsizarr" Mode="rw" Description="Stores the metrics database and logs." Type="Path" Display="always" Required="true" Mask="false">/mnt/user/appdata/downsizarr</Config>
 
-  <Config Name="Output Suffix" Target="DOWNSIZARR_OUTPUT_SUFFIX" Default=".hevc" Mode="" Description="Inserted before the extension: Movie.mkv -> Movie.hevc.mkv" Type="Variable" Display="always" Required="false" Mask="false">.hevc</Config>
+  <Config Name="Default Encoder" Target="DOWNSIZARR_DEFAULT_ENCODER" Default="hevc_nvenc" Mode="" Description="hevc_nvenc (NVIDIA GPU/CUDA, default), libx265 (CPU, best quality), hevc_qsv or hevc_vaapi (Intel/AMD GPU)." Type="Variable" Display="always" Required="false" Mask="false">hevc_nvenc</Config>
 
-  <Config Name="Max Concurrent" Target="DOWNSIZARR_MAX_CONCURRENT" Default="1" Mode="" Description="How many transcodes run at once. Keep at 1 for QA / libx265 slow." Type="Variable" Display="always" Required="false" Mask="false">1</Config>
+  <Config Name="Default CRF / CQ" Target="DOWNSIZARR_DEFAULT_CRF" Default="18" Mode="" Description="Quality target. Lower = higher quality + larger. 18 is high quality." Type="Variable" Display="always" Required="false" Mask="false">18</Config>
 
-  <Config Name="Default Encoder" Target="DOWNSIZARR_DEFAULT_ENCODER" Default="libx265" Mode="" Description="libx265 (software, best quality), hevc_nvenc, hevc_qsv, or hevc_vaapi" Type="Variable" Display="always" Required="false" Mask="false">libx265</Config>
+  <Config Name="Default Preset" Target="DOWNSIZARR_DEFAULT_PRESET" Default="p7" Mode="" Description="NVENC: p1 (fastest) .. p7 (best quality, default). libx265: ultrafast..veryslow (e.g. slow)." Type="Variable" Display="advanced" Required="false" Mask="false">p7</Config>
 
-  <Config Name="Default CRF" Target="DOWNSIZARR_DEFAULT_CRF" Default="18" Mode="" Description="Quality target. Lower = higher quality + larger. 18 is visually transparent." Type="Variable" Display="always" Required="false" Mask="false">18</Config>
+  <Config Name="NVENC full CUDA decode" Target="DOWNSIZARR_DEFAULT_GPU_DECODE" Default="true" Mode="" Description="Decode AND encode on the GPU (fastest). Set false to decode on CPU (more compatible with unusual sources)." Type="Variable" Display="advanced" Required="false" Mask="false">true</Config>
 
-  <Config Name="Default Preset" Target="DOWNSIZARR_DEFAULT_PRESET" Default="slow" Mode="" Description="libx265 preset. slower = better compression." Type="Variable" Display="advanced" Required="false" Mask="false">slow</Config>
+  <Config Name="NVIDIA GPU" Target="NVIDIA_VISIBLE_DEVICES" Default="all" Mode="" Description="GPU UUID from the Unraid Nvidia Driver plugin (e.g. GPU-abc123...), or 'all'. Required for NVENC." Type="Variable" Display="always" Required="false" Mask="false">all</Config>
 
-  <Config Name="Intel GPU (QSV/VAAPI)" Target="/dev/dri" Default="/dev/dri" Mode="" Description="Optional: pass through the Intel iGPU for hardware encoding (hevc_qsv / hevc_vaapi)." Type="Device" Display="advanced" Required="false" Mask="false">/dev/dri</Config>
+  <Config Name="NVIDIA capabilities" Target="NVIDIA_DRIVER_CAPABILITIES" Default="all" Mode="" Description="Leave as 'all' for NVENC/CUDA." Type="Variable" Display="advanced" Required="false" Mask="false">all</Config>
+
+  <Config Name="Max Concurrent" Target="DOWNSIZARR_MAX_CONCURRENT" Default="1" Mode="" Description="How many transcodes run at once. 1 is fine for GPU; keep at 1 for CPU/libx265." Type="Variable" Display="advanced" Required="false" Mask="false">1</Config>
+
+  <Config Name="Output Suffix" Target="DOWNSIZARR_OUTPUT_SUFFIX" Default=".hevc" Mode="" Description="Inserted before the extension: Movie.mkv -> Movie.hevc.mkv" Type="Variable" Display="advanced" Required="false" Mask="false">.hevc</Config>
+
+  <Config Name="Intel GPU (QSV/VAAPI)" Target="/dev/dri" Default="/dev/dri" Mode="" Description="Optional: pass through an Intel iGPU for hevc_qsv / hevc_vaapi (not needed for NVIDIA)." Type="Device" Display="advanced" Required="false" Mask="false">/dev/dri</Config>
 </Container>
