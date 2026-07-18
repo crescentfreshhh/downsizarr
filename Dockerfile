@@ -1,24 +1,40 @@
 # Downsizarr - H264 -> H265/HEVC batch transcoder with web GUI
 FROM python:3.12-slim
 
+LABEL org.opencontainers.image.source="https://github.com/crescentfreshhh/downsizarr" \
+      org.opencontainers.image.description="Batch H264 to H265/HEVC transcoder with a web GUI (GPU/CPU)" \
+      org.opencontainers.image.licenses="MIT"
+
 ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
     DOWNSIZARR_MEDIA_ROOT=/media \
     DOWNSIZARR_DATA_DIR=/config \
     DOWNSIZARR_PORT=8080
 
-# Runtime libs + VAAPI/QSV drivers (Intel iGPU). We do NOT use the distro
-# ffmpeg because it lacks libvmaf (quality scoring) and nvenc; instead we drop
-# in a static BtbN build that bundles libx265, libvmaf, nvenc, VAAPI and QSV.
+# Essential runtime deps (all in Debian main). We do NOT use the distro ffmpeg
+# because it lacks libvmaf (quality scoring) and nvenc; instead we drop in a
+# static BtbN build (next step) that bundles libx265, libvmaf, nvenc, etc.
 RUN apt-get update && apt-get install -y --no-install-recommends \
         curl \
         xz-utils \
         vainfo \
-        intel-media-va-driver-non-free \
         mesa-va-drivers \
         libva2 \
         libva-drm2 \
     && rm -rf /var/lib/apt/lists/*
+
+# Optional Intel QSV/VAAPI hardware driver (lives in Debian non-free). Best
+# effort: NVIDIA and CPU encoding don't need it, so a failure here must NOT
+# break the image build.
+RUN set -eux; \
+    if [ -f /etc/apt/sources.list.d/debian.sources ]; then \
+        sed -i 's/^Components: main$/Components: main contrib non-free non-free-firmware/' \
+            /etc/apt/sources.list.d/debian.sources; \
+    fi; \
+    apt-get update \
+    && apt-get install -y --no-install-recommends intel-media-va-driver-non-free \
+    && rm -rf /var/lib/apt/lists/* \
+    || echo "WARN: intel-media-va-driver-non-free unavailable; Intel QSV may be limited";
 
 # Static ffmpeg/ffprobe with libx265 + libvmaf + nvenc (GPL build).
 # Override FFMPEG_BUILD_URL at build time to pin a specific release if desired.
